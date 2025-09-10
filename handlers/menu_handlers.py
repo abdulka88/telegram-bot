@@ -355,10 +355,11 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await confirm_delete_employee(update, context)
             
         else:
+            logger.warning(f"❌ Неизвестное действие: {action}")
             await query.edit_message_text("❌ Неизвестная команда")
             
     except Exception as e:
-        logger.error(f"Error in menu_handler: {e}")
+        logger.error(f"Error in menu_handler: {e}", exc_info=True)
         logger.error(f"Update details: {update}")
         logger.error(f"Context details: {context}")
         await query.edit_message_text("❌ Произошла ошибка при обработке команды")

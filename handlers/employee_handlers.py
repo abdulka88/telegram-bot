@@ -163,15 +163,24 @@ async def show_position_selection(update: Update, context: ContextTypes.DEFAULT_
         logger.info(f"📤 Отправляем сообщение с клавиатурой...")
         # Удаляем обычную клавиатуру и отправляем сообщение с инлайн клавиатурой
         # Handle both message and callback query updates
-        if update.message:
+        if hasattr(update, 'callback_query') and update.callback_query:
+            # If called from a callback query, edit the message
+            await update.callback_query.edit_message_text(
+                f"👤 Сотрудник: <b>{full_name}</b>\n\n"
+                "💼 Выберите должность:",
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
+        elif hasattr(update, 'message') and update.message:
+            # If called from a message, reply to it and remove the regular keyboard
             await update.message.reply_text(
                 f"👤 Сотрудник: <b>{full_name}</b>\n\n"
                 "💼 Выберите должность:",
                 reply_markup=reply_markup,
                 parse_mode='HTML'
             )
-        elif update.callback_query:
-            # If called from a callback query, we need to send a new message
+        else:
+            # Fallback: send a new message
             chat_id = update.effective_chat.id
             await context.bot.send_message(
                 chat_id=chat_id,
@@ -189,34 +198,46 @@ async def show_position_selection(update: Update, context: ContextTypes.DEFAULT_
 
 async def handle_position_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка выбора должности из списка"""
+    logger.info("📥 handle_position_selection called!")
+    logger.info(f"   Update type: {type(update)}")
+    logger.info(f"   Callback query data: {update.callback_query.data if update.callback_query else 'No callback query'}")
+    
     query = update.callback_query
     
     # Обработка таймаутов
     try:
         await query.answer()
+        logger.info("✅ Callback query answered")
     except Exception as e:
         logger.warning(f"Failed to answer callback query in handle_position_selection: {e}")
     
     data = parse_callback_data(query.data)
+    logger.info(f"   Parsed data: {data}")
     position = data.get('position')
+    logger.info(f"   Position: {position}")
     
     if not position:
+        logger.warning("❌ No position in callback data")
         await query.edit_message_text("❌ Ошибка при выборе должности")
         return ConversationHandler.END
     
     user_data = context.user_data
     full_name = user_data.get('full_name')
+    logger.info(f"   Full name from context: {full_name}")
     
     # Проверяем, что у нас есть имя сотрудника
     if not full_name:
+        logger.warning("❌ No full name in user data")
         await query.edit_message_text("❌ Ошибка: не указано имя сотрудника")
         return ConversationHandler.END
     
     user_id = user_data.get('user_id')
     chat_id = update.effective_chat.id
+    logger.info(f"   User ID: {user_id}, Chat ID: {chat_id}")
 
     # Шифрование конфиденциальных данных
     encrypted_name = encrypt_data(full_name)
+    logger.info("✅ Name encrypted")
 
     try:
         with db_manager.get_connection() as conn:
@@ -229,10 +250,12 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
             # Сохраняем ID нового сотрудника
             user_data['new_employee_id'] = cursor.lastrowid
             conn.commit()
+            logger.info(f"✅ Employee inserted with ID: {cursor.lastrowid}")
 
         # Автоматически применяем шаблон для выбранной должности
         employee_id = user_data['new_employee_id']
         template_applied = await template_manager.apply_template_by_position(employee_id, position)
+        logger.info(f"   Template applied: {template_applied}")
 
         if template_applied:
             await query.edit_message_text(
@@ -252,11 +275,12 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
             
         return ConversationHandler.END
         
-    except sqlite3.IntegrityError:
+    except sqlite3.IntegrityError as e:
+        logger.error(f"SQLite integrity error: {e}")
         await query.edit_message_text("❌ Сотрудник с таким именем уже существует")
         return ConversationHandler.END
     except Exception as e:
-        logger.error(f"Error saving employee: {e}")
+        logger.error(f"Error saving employee: {e}", exc_info=True)
         await query.edit_message_text("❌ Произошла ошибка при сохранении сотрудника")
         return ConversationHandler.END
 

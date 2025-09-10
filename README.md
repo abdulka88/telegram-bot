@@ -67,13 +67,6 @@ telegram_bot/
 │   ├── test_temporal_charts.py
 │   └── test_text_search.py
 │
-├── archive/               # Архивные файлы
-│   ├── backup_monolithic_*
-│   ├── main_old.py
-│   ├── phase1_improvements.py
-│   ├── transition_to_modular.py
-│   └── setup_bot.py
-│
 └── docs/                  # Документация
     ├── README.md
     ├── README_MODULAR.md

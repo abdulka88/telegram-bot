@@ -255,7 +255,7 @@ def main():
             entry_points=[
                 CallbackQueryHandler(
                     add_employee_start,
-                    pattern=r'^\{"action":\s*"add_employee".*'
+                    pattern=r'.*"action"\s*:\s*"add_employee".*'
                 )
             ],
             states={
@@ -264,8 +264,8 @@ def main():
                     MessageHandler(filters.TEXT & ~filters.COMMAND, add_employee_name)
                 ],
                 ConversationStates.ADD_POSITION: [
-                    CallbackQueryHandler(handle_position_selection, pattern=r'^\{"action":\s*"select_position".*'),
-                    CallbackQueryHandler(cancel_add_employee, pattern=r'^\{"action":\s*"cancel_add_employee".*')
+                    CallbackQueryHandler(handle_position_selection, pattern=r'.*"action"\s*:\s*"select_position".*'),
+                    CallbackQueryHandler(cancel_add_employee, pattern=r'.*"action"\s*:\s*"cancel_add_employee".*')
                 ],
                 ConversationStates.ADD_EVENT_TYPE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, add_event_type)
@@ -288,7 +288,7 @@ def main():
             entry_points=[
                 CallbackQueryHandler(
                     edit_employee_name,
-                    pattern=r'^\{"action":\s*"edit_name".*'
+                    pattern=r'.*"action"\s*:\s*"edit_name".*'
                 )
             ],
             states={
@@ -309,7 +309,7 @@ def main():
             entry_points=[
                 CallbackQueryHandler(
                     add_event_to_employee,
-                    pattern=r'^\{"action":\s*"add_event".*'
+                    pattern=r'.*"action"\s*:\s*"add_event".*'
                 )
             ],
             states={
