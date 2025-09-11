@@ -54,15 +54,22 @@ async def add_employee_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     logger.info(f"✅ Проверка администратора пройдена")
 
-    # Отправляем сообщение с запросом ФИО без клавиатуры
+    # Создаем клавиатуру с кнопкой отмены
+    from telegram import ReplyKeyboardMarkup, KeyboardButton
+    keyboard = [[KeyboardButton("❌ Отмена")]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    
+    # Отправляем сообщение с запросом ФИО с клавиатурой отмены
+    # Сохраняем главное меню, отправляем новое сообщение поверх
     logger.info(f"📤 Отправляем сообщение с запросом ФИО...")
     if query:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Введите ФИО сотрудника:"
+            text="Введите ФИО сотрудника:",
+            reply_markup=reply_markup
         )
     else:
-        await update.message.reply_text("Введите ФИО сотрудника:")
+        await update.message.reply_text("Введите ФИО сотрудника:", reply_markup=reply_markup)
         
     logger.info(f"✅ Сообщение отправлено, переходим в состояние ADD_NAME")
     return ConversationStates.ADD_NAME
@@ -97,19 +104,54 @@ async def add_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         logger.error("❌ No message text received in add_employee_name")
         return ConversationStates.ADD_NAME
     
+    # Проверяем, не нажата ли кнопка отмены
+    if update.message.text == "❌ Отмена":
+        # Удаляем сообщение с ФИО и сообщение с кнопкой отмены
+        from core.utils import delete_message_safely
+        await delete_message_safely(context, update.effective_chat.id, update.message.message_id)
+        
+        # Отправляем сообщение об отмене и убираем клавиатуру
+        from telegram import ReplyKeyboardRemove
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Добавление сотрудника отменено",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        # Показываем главное меню снова
+        from handlers.menu_handlers import show_menu
+        await show_menu(update, context)
+        return ConversationHandler.END
+    
+    # Не удаляем главное меню, отправляем новое сообщение
+    # Удаляем только сообщение с вводом ФИО
+    from core.utils import delete_message_safely
+    await delete_message_safely(context, update.effective_chat.id, update.message.message_id)
+    
     full_name = update.message.text
     logger.info(f"📝 Полученное имя: '{full_name}'")
     
     if not validate_name(full_name):
         logger.warning(f"❌ Валидация имени не прошла: '{full_name}'")
-        await update.message.reply_text("❌ Неверный формат имени. Должно быть 2-100 символов.")
+        # Отправляем сообщение с ошибкой без клавиатуры
+        from telegram import ReplyKeyboardRemove
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверный формат имени. Должно быть 2-100 символов.",
+            reply_markup=ReplyKeyboardRemove()
+        )
         return ConversationStates.ADD_NAME
 
     logger.info(f"✅ Валидация прошла успешно")
     context.user_data['full_name'] = full_name
     logger.info(f"💾 Имя сохранено в user_data: '{full_name}'")
     
-    # Показываем клавиатуру выбора должности
+    # Показываем клавиатуру выбора должности и убираем клавиатуру отмены
+    from telegram import ReplyKeyboardRemove
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Выберите должность из списка ниже:", 
+        reply_markup=ReplyKeyboardRemove()
+    )  # Убираем клавиатуру с непустым текстом
     logger.info(f"🎯 Вызываем show_position_selection...")
     await show_position_selection(update, context)
     logger.info(f"✅ show_position_selection выполнена, возвращаем ADD_POSITION")
@@ -126,6 +168,9 @@ async def show_position_selection(update: Update, context: ContextTypes.DEFAULT_
     logger.info(f"🔍 Full name in context: {context.user_data.get('full_name', 'Not found')}")
     logger.info(f"🔍 Update effective chat: {update.effective_chat if update.effective_chat else 'No chat'}")
     logger.info(f"🔍 Update effective user: {update.effective_user if update.effective_user else 'No user'}")
+    logger.info(f"🔍 Update callback query: {update.callback_query if update.callback_query else 'No callback query'}")
+    
+    # Не удаляем главное меню, отправляем новое сообщение с выбором должности
     
     # Создаем клавиатуру с должностями (по 2 в ряду)
     keyboard = []
@@ -135,14 +180,19 @@ async def show_position_selection(update: Update, context: ContextTypes.DEFAULT_
         row = []
         for j in range(2):
             if i + j < len(AVAILABLE_POSITIONS):
+                # Use index instead of full position name to stay within 64-character limit
+                callback_data = create_callback_data("select_position", position_index=i + j)
+                logger.info(f"   Creating button: {AVAILABLE_POSITIONS[i + j]} with callback_data: {callback_data}")
                 row.append(InlineKeyboardButton(
                     AVAILABLE_POSITIONS[i + j],
-                    callback_data=create_callback_data("select_position", position=AVAILABLE_POSITIONS[i + j])
+                    callback_data=callback_data
                 ))
         keyboard.append(row)
     
     # Добавляем кнопку отмены
-    keyboard.append([InlineKeyboardButton("❌ Отмена", callback_data=create_callback_data("cancel_add_employee"))])
+    cancel_callback_data = create_callback_data("cancel_add_employee")
+    logger.info(f"   Creating cancel button with callback_data: {cancel_callback_data}")
+    keyboard.append([InlineKeyboardButton("❌ Отмена", callback_data=cancel_callback_data)])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     logger.info(f"✅ Клавиатура создана: {len(keyboard)} рядов")
@@ -150,20 +200,20 @@ async def show_position_selection(update: Update, context: ContextTypes.DEFAULT_
     # Получаем имя сотрудника из контекста или используем значение по умолчанию
     full_name = context.user_data.get('full_name', 'Неизвестный сотрудник')
     
-    # Отправляем сообщение с инлайн клавиатурой
+    # Отправляем сообщение с инлайн клавиатурой поверх главного меню
     try:
         logger.info(f"📤 Отправляем сообщение с клавиатурой...")
         chat_id = update.effective_chat.id
         
-        # Отправляем новое сообщение с инлайн клавиатурой
-        await context.bot.send_message(
+        # Отправляем новое сообщение с инлайн клавиатурой поверх главного меню
+        message = await context.bot.send_message(
             chat_id=chat_id,
             text=f"👤 Сотрудник: <b>{full_name}</b>\n\n"
                  "💼 Выберите должность:",
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
-        logger.info(f"✅ Основное сообщение отправлено")
+        logger.info(f"✅ Основное сообщение отправлено, message_id: {message.message_id}")
         
     except Exception as e:
         logger.error(f"❌ Ошибка отправки сообщения с клавиатурой: {e}")
@@ -174,9 +224,14 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
     """Обработка выбора должности из списка"""
     logger.info("📥 handle_position_selection called!")
     logger.info(f"   Update type: {type(update)}")
-    logger.info(f"   Callback query data: {update.callback_query.data if update.callback_query else 'No callback query'}")
+    logger.info(f"   Full update object: {update}")
     
+    if not update.callback_query:
+        logger.error("❌ No callback query in update")
+        return ConversationHandler.END
+        
     query = update.callback_query
+    logger.info(f"   Callback query data: {query.data if query.data else 'No data'}")
     
     # Обработка таймаутов
     try:
@@ -185,14 +240,36 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
     except Exception as e:
         logger.warning(f"Failed to answer callback query in handle_position_selection: {e}")
     
+    # Не удаляем главное меню, отправляем новое сообщение
+    # Удаляем только сообщение с выбором должности
+    if query.message:
+        from core.utils import delete_message_safely
+        await delete_message_safely(context, query.message.chat_id, query.message.message_id)
+    
+    if not query.data:
+        logger.error("❌ No data in callback query")
+        # Отправляем новое сообщение поверх главного меню
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: нет данных в callback-запросе"
+        )
+        return ConversationHandler.END
+    
     data = parse_callback_data(query.data)
     logger.info(f"   Parsed data: {data}")
-    position = data.get('position')
+    
+    # Get position by index instead of directly
+    position_index = data.get('position_index')
+    if position_index is not None and 0 <= position_index < len(AVAILABLE_POSITIONS):
+        position = AVAILABLE_POSITIONS[position_index]
+    else:
+        position = None
+    
     logger.info(f"   Position: {position}")
     
     if not position:
         logger.warning("❌ No position in callback data")
-        # Отправляем новое сообщение вместо редактирования
+        # Отправляем новое сообщение поверх главного меню
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="❌ Ошибка при выборе должности"
@@ -206,7 +283,7 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
     # Проверяем, что у нас есть имя сотрудника
     if not full_name:
         logger.warning("❌ No full name in user data")
-        # Отправляем новое сообщение вместо редактирования
+        # Отправляем новое сообщение поверх главного меню
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="❌ Ошибка: не указано имя сотрудника"
@@ -239,30 +316,36 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
         template_applied = await template_manager.apply_template_by_position(employee_id, position)
         logger.info(f"   Template applied: {template_applied}")
 
-        # Отправляем новое сообщение вместо редактирования
+        # Если шаблон применен, запрашиваем даты для прошедших событий
         if template_applied:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"✅ Сотрудник <b>{full_name}</b> с должностью <b>{position}</b> успешно добавлен!\n\n"
-                     f"🎯 Автоматически применен шаблон событий для данной должности.\n"
-                     f"📅 Все необходимые события добавлены в календарь.",
-                parse_mode='HTML'
-            )
-        else:
-            # Если не удалось применить шаблон, переходим к ручному добавлению события
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"✅ Сотрудник <b>{full_name}</b> с должностью <b>{position}</b> успешно добавлен!\n\n"
-                     "📅 Введите тип периодического события (например, 'Медосмотр' / 'Проверка знаний П-1' и т.д.):",
-                parse_mode='HTML'
-            )
-            return ConversationStates.ADD_EVENT_TYPE
-            
+            # Получаем список событий для этой должности
+            template_key = template_manager.get_template_by_position(position)
+            if template_key:
+                template_info = template_manager.get_template_info(template_key)
+                if template_info and template_info['events']:
+                    # Сохраняем список событий в user_data
+                    user_data['pending_events'] = template_info['events'].copy()
+                    user_data['completed_events'] = []
+                    user_data['position'] = position  # Сохраняем должность для последующего использования
+                    
+                    # Переходим к запросу дат для прошедших событий
+                    await request_past_event_dates(update, context)
+                    return ConversationStates.ADD_PAST_EVENT_DATES
+        
+        # Отправляем новое сообщение поверх главного меню
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"✅ Сотрудник <b>{full_name}</b> с должностью <b>{position}</b> успешно добавлен!",
+            parse_mode='HTML'
+        )
+        # Показываем главное меню снова
+        from handlers.menu_handlers import show_menu
+        await show_menu(update, context)
         return ConversationHandler.END
         
     except sqlite3.IntegrityError as e:
         logger.error(f"SQLite integrity error: {e}")
-        # Отправляем новое сообщение вместо редактирования
+        # Отправляем новое сообщение поверх главного меню
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="❌ Сотрудник с таким именем уже существует"
@@ -270,10 +353,163 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"Error saving employee: {e}", exc_info=True)
-        # Отправляем новое сообщение вместо редактирования
+        # Отправляем новое сообщение поверх главного меню
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="❌ Произошла ошибка при сохранении сотрудника"
+        )
+        return ConversationHandler.END
+
+async def request_past_event_dates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Запрашивает даты прошедших событий у пользователя"""
+    user_data = context.user_data
+    pending_events = user_data.get('pending_events', [])
+    
+    if not pending_events:
+        # Все события обработаны
+        full_name = user_data.get('full_name', 'Неизвестный сотрудник')
+        position = user_data.get('position', 'Неизвестная должность')
+        
+        # Не удаляем главное меню, отправляем новое сообщение
+        # Удаляем только сообщение с запросом даты
+        if update.callback_query and update.callback_query.message:
+            from core.utils import delete_message_safely
+            await delete_message_safely(context, update.effective_chat.id, update.callback_query.message.message_id)
+        elif update.message:
+            from core.utils import delete_message_safely
+            await delete_message_safely(context, update.effective_chat.id, update.message.message_id)
+        
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"✅ Сотрудник <b>{full_name}</b> с должностью <b>{position}</b> успешно добавлен!\n\n"
+                 f"🎯 Все события обработаны и добавлены в календарь.",
+            parse_mode='HTML'
+        )
+        # Показываем главное меню снова
+        from handlers.menu_handlers import show_menu
+        await show_menu(update, context)
+        return
+    
+    # Берем первое событие из списка
+    current_event = pending_events[0]
+    event_type = current_event['type']
+    interval_days = current_event['interval_days']
+    
+    # Сохраняем текущее событие
+    user_data['current_event'] = current_event
+    
+    # Не удаляем главное меню, отправляем новое сообщение
+    # Удаляем только сообщение с запросом даты
+    if update.callback_query and update.callback_query.message:
+        from core.utils import delete_message_safely
+        await delete_message_safely(context, update.effective_chat.id, update.callback_query.message.message_id)
+    elif update.message:
+        from core.utils import delete_message_safely
+        await delete_message_safely(context, update.effective_chat.id, update.message.message_id)
+    
+    # Отправляем сообщение с запросом даты поверх главного меню
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"📅 Введите дату последнего события <b>«{event_type}»</b> в формате ДД.ММ.ГГГГ\n\n"
+             f"ℹ️ Интервал повторения: {interval_days} дней",
+        parse_mode='HTML'
+    )
+
+async def handle_past_event_date_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Обработка ввода даты прошедшего события"""
+    user_data = context.user_data
+    current_event = user_data.get('current_event')
+    
+    if not current_event:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: нет данных о текущем событии"
+        )
+        return ConversationHandler.END
+    
+    # Не удаляем главное меню, отправляем новое сообщение
+    # Удаляем только сообщение с вводом даты
+    from core.utils import delete_message_safely
+    await delete_message_safely(context, update.effective_chat.id, update.message.message_id)
+    
+    date_str = update.message.text
+    if not validate_date(date_str):
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ"
+        )
+        return ConversationStates.ADD_PAST_EVENT_DATE_INPUT
+    
+    try:
+        # Преобразуем дату в объект datetime
+        last_date = datetime.strptime(date_str, "%d.%m.%Y").date()
+        
+        # Обновляем дату события в базе данных
+        employee_id = user_data['new_employee_id']
+        event_type = current_event['type']
+        interval_days = current_event['interval_days']
+        
+        # Рассчитываем следующую дату уведомления
+        from datetime import timedelta
+        next_date = last_date + timedelta(days=interval_days)
+        
+        # Обновляем событие в базе данных
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE employee_events 
+                SET last_event_date = ?, next_notification_date = ?
+                WHERE employee_id = ? AND event_type = ?
+            ''', (last_date.isoformat(), next_date.isoformat(), employee_id, event_type))
+            conn.commit()
+        
+        # Добавляем событие в список завершенных
+        completed_events = user_data.get('completed_events', [])
+        completed_events.append(current_event)
+        user_data['completed_events'] = completed_events
+        
+        # Удаляем событие из списка ожидающих
+        pending_events = user_data.get('pending_events', [])
+        if pending_events:
+            pending_events.pop(0)
+            user_data['pending_events'] = pending_events
+        
+        # Если есть еще события, запрашиваем дату для следующего
+        if pending_events:
+            await request_past_event_dates(update, context)
+            return ConversationStates.ADD_PAST_EVENT_DATES
+        else:
+            # Все события обработаны
+            full_name = user_data.get('full_name', 'Неизвестный сотрудник')
+            position = user_data.get('position', 'Неизвестная должность')
+            
+            # Не удаляем главное меню, отправляем новое сообщение
+            # Удаляем только сообщение с вводом даты
+            from core.utils import delete_message_safely
+            await delete_message_safely(context, update.effective_chat.id, update.message.message_id)
+            
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"✅ Сотрудник <b>{full_name}</b> с должностью <b>{position}</b> успешно добавлен!\n\n"
+                     f"🎯 Все события обработаны и добавлены в календарь.",
+                parse_mode='HTML'
+            )
+            # Показываем главное меню снова
+            from handlers.menu_handlers import show_menu
+            await show_menu(update, context)
+            return ConversationHandler.END
+            
+    except ValueError:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверная дата. Проверьте правильность ввода."
+        )
+        return ConversationStates.ADD_PAST_EVENT_DATE_INPUT
+    except Exception as e:
+        logger.error(f"Error updating event date: {e}")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Произошла ошибка при обновлении даты события"
         )
         return ConversationHandler.END
 
@@ -281,12 +517,16 @@ async def add_event_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Обработка ввода типа события"""
     event_type = update.message.text
     if not validate_event_type(event_type):
-        await update.message.reply_text("❌ Неверный формат типа события. Должно быть 2-50 символов.")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверный формат типа события. Должно быть 2-50 символов."
+        )
         return ConversationStates.ADD_EVENT_TYPE
 
     context.user_data['event_type'] = event_type
-    await update.message.reply_text(
-        "Введите дату последнего события в формате ДД.ММ.ГГГГ (например, 15.05.2023):"
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Введите дату последнего события в формате ДД.ММ.ГГГГ (например, 15.05.2023):"
     )
     return ConversationStates.ADD_LAST_DATE
 
@@ -294,7 +534,10 @@ async def add_last_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     """Обработка ввода даты последнего события"""
     date_str = update.message.text
     if not validate_date(date_str):
-        await update.message.reply_text("❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ"
+        )
         return ConversationStates.ADD_LAST_DATE
 
     try:
@@ -302,19 +545,26 @@ async def add_last_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         last_date = datetime.strptime(date_str, "%d.%m.%Y").date()
         context.user_data['last_date'] = last_date.isoformat()
 
-        await update.message.reply_text(
-            "Введите интервал в днях между событиями (например, 365):"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Введите интервал в днях между событиями (например, 365):"
         )
         return ConversationStates.ADD_INTERVAL
     except ValueError:
-        await update.message.reply_text("❌ Неверная дата. Проверьте правильность ввода.")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверная дата. Проверьте правильность ввода."
+        )
         return ConversationStates.ADD_LAST_DATE
 
 async def add_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка ввода интервала и сохранение события"""
     interval_str = update.message.text
     if not validate_interval(interval_str):
-        await update.message.reply_text("❌ Неверный интервал. Введите число от 1 до 3650.")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверный интервал. Введите число от 1 до 3650."
+        )
         return ConversationStates.ADD_INTERVAL
 
     interval = int(interval_str)
@@ -338,32 +588,47 @@ async def add_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             conn.commit()
 
         # Завершаем процесс
-        await update.message.reply_text(
-            f"✅ Событие '{user_data['event_type']}' успешно добавлено!\n"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"✅ Событие '{user_data['event_type']}' успешно добавлено!\n"
             f"Следующее уведомление: {next_date.strftime('%d.%m.%Y')}",
             reply_markup=ReplyKeyboardRemove()
         )
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"Error saving event: {e}")
-        await update.message.reply_text("❌ Произошла ошибка при сохранении события")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Произошла ошибка при сохранении события"
+        )
         return ConversationHandler.END
 
 async def cancel_add_employee(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка отмены добавления сотрудника"""
+    # Не удаляем главное меню, отправляем новое сообщение
     if update.callback_query:
         query = update.callback_query
         await query.answer()
-        # Отправляем новое сообщение вместо редактирования
+        # Удаляем только сообщение с кнопкой отмены
+        from core.utils import delete_message_safely
+        await delete_message_safely(context, update.effective_chat.id, query.message.message_id)
+        # Отправляем новое сообщение поверх главного меню
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="❌ Добавление сотрудника отменено"
         )
     else:
-        await update.message.reply_text(
-            "❌ Добавление сотрудника отменено",
+        # Удаляем сообщение с кнопкой отмены
+        from core.utils import delete_message_safely
+        await delete_message_safely(context, update.effective_chat.id, update.message.message_id)
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Добавление сотрудника отменено",
             reply_markup=ReplyKeyboardRemove()
         )
+    # Показываем главное меню снова
+    from handlers.menu_handlers import show_menu
+    await show_menu(update, context)
     return ConversationHandler.END
 
 async def list_employees(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -571,7 +836,7 @@ async def edit_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
     employee_id = data.get('id')
     
     if not employee_id:
-        # Отправляем новое сообщение вместо редактирования
+        # Отправляем новое сообщение поверх главного меню
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="❌ Ошибка: сотрудник не найден"
@@ -584,7 +849,7 @@ async def edit_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
     ''', (employee_id,), fetch="one")
     
     if not employee:
-        # Отправляем новое сообщение вместо редактирования
+        # Отправляем новое сообщение поверх главного меню
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="❌ Сотрудник не найден"
@@ -605,7 +870,7 @@ async def edit_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
     
-    # Отправляем сообщение с запросом
+    # Отправляем сообщение с запросом поверх главного меню
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=(
@@ -626,21 +891,26 @@ async def save_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Проверяем отмену
     if new_name == "❌ Отмена":
-        await update.message.reply_text(
-            "❌ Редактирование отменено",
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Редактирование отменено",
             reply_markup=ReplyKeyboardRemove()
         )
         return ConversationHandler.END
     
     # Проверяем валидность имени
     if not validate_name(new_name):
-        await update.message.reply_text("❌ Неверный формат имени. Должно быть 2-100 символов.")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверный формат имени. Должно быть 2-100 символов."
+        )
         return ConversationStates.EDIT_NAME
     
     employee_id = context.user_data.get('editing_employee_id')
     if not employee_id:
-        await update.message.reply_text(
-            "❌ Ошибка: не удается определить сотрудника",
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: не удается определить сотрудника",
             reply_markup=ReplyKeyboardRemove()
         )
         return ConversationHandler.END
@@ -652,8 +922,9 @@ async def save_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ''', (employee_id,), fetch="one")
         
         if not employee:
-            await update.message.reply_text(
-                "❌ Сотрудник не найден",
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="❌ Сотрудник не найден",
                 reply_markup=ReplyKeyboardRemove()
             )
             return ConversationHandler.END
@@ -665,11 +936,12 @@ async def save_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         # Проверяем, что имя действительно изменилось
         if old_name == new_name:
-            await update.message.reply_text(
-                f"ℹ️ <b>Имя не изменено</b>\n\n"
-                f"👤 Имя: <b>{new_name}</b>\n"
-                f"💼 Должность: <b>{employee['position']}</b>\n\n"
-                f"Имя уже было установлено.",
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"ℹ️ <b>Имя не изменено</b>\n\n"
+                     f"👤 Имя: <b>{new_name}</b>\n"
+                     f"💼 Должность: <b>{employee['position']}</b>\n\n"
+                     f"Имя уже было установлено.",
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode='HTML'
             )
@@ -683,11 +955,12 @@ async def save_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
             UPDATE employees SET full_name = ? WHERE id = ?
         ''', (encrypted_name, employee_id))
         
-        await update.message.reply_text(
-            f"✅ <b>Имя сотрудника изменено!</b>\n\n"
-            f"👤 Старое имя: <b>{old_name}</b>\n"
-            f"👤 Новое имя: <b>{new_name}</b>\n"
-            f"💼 Должность: <b>{employee['position']}</b>",
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"✅ <b>Имя сотрудника изменено!</b>\n\n"
+                 f"👤 Старое имя: <b>{old_name}</b>\n"
+                 f"👤 Новое имя: <b>{new_name}</b>\n"
+                 f"💼 Должность: <b>{employee['position']}</b>",
             reply_markup=ReplyKeyboardRemove(),
             parse_mode='HTML'
         )
@@ -698,15 +971,17 @@ async def save_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ConversationHandler.END
         
     except sqlite3.IntegrityError:
-        await update.message.reply_text(
-            "❌ Сотрудник с таким именем уже существует",
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Сотрудник с таким именем уже существует",
             reply_markup=ReplyKeyboardRemove()
         )
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"Error updating employee name: {e}")
-        await update.message.reply_text(
-            "❌ Ошибка при обновлении имени",
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка при обновлении имени",
             reply_markup=ReplyKeyboardRemove()
         )
         return ConversationHandler.END
@@ -880,7 +1155,7 @@ async def add_event_to_employee(update: Update, context: ContextTypes.DEFAULT_TY
     employee_id = data.get('id')
     
     if not employee_id:
-        # Отправляем новое сообщение вместо редактирования
+        # Отправляем новое сообщение поверх главного меню
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="❌ Ошибка: сотрудник не найден"
@@ -896,7 +1171,7 @@ async def add_event_to_employee(update: Update, context: ContextTypes.DEFAULT_TY
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
     
-    # Отправляем сообщение с запросом
+    # Отправляем сообщение с запросом поверх главного меню
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text="Введите тип периодического события (например, 'Медосмотр' / 'Проверка знаний П-1' и т.д.):",
@@ -910,8 +1185,9 @@ async def add_event_to_employee_type(update: Update, context: ContextTypes.DEFAU
     event_type = update.message.text.strip()
     
     if not validate_event_type(event_type):
-        await update.message.reply_text(
-            "❌ Неверное название события.\n"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверное название события.\n"
             "Должно быть от 2 до 50 символов.\n\n"
             "Попробуйте ещё раз:"
         )
@@ -921,11 +1197,12 @@ async def add_event_to_employee_type(update: Update, context: ContextTypes.DEFAU
     
     employee_name = context.user_data.get('current_employee_name', 'Неизвестно')
     
-    await update.message.reply_text(
-        f"✅ Название: <b>{event_type}</b>\n\n"
-        f"📅 Теперь введите дату последнего события\n"
-        f"в формате ДД.ММ.ГГГГ\n\n"
-        f"ℹ️ Пример: 15.03.2024",
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"✅ Название: <b>{event_type}</b>\n\n"
+             f"📅 Теперь введите дату последнего события\n"
+             f"в формате ДД.ММ.ГГГГ\n\n"
+             f"ℹ️ Пример: 15.03.2024",
         parse_mode='HTML'
     )
     
@@ -936,8 +1213,9 @@ async def add_event_to_employee_date(update: Update, context: ContextTypes.DEFAU
     date_str = update.message.text.strip()
     
     if not validate_date(date_str):
-        await update.message.reply_text(
-            "❌ Неверный формат даты.\n"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверный формат даты.\n"
             "Используйте формат ДД.ММ.ГГГГ\n\n"
             "Пример: 15.03.2024"
         )
@@ -950,19 +1228,21 @@ async def add_event_to_employee_date(update: Update, context: ContextTypes.DEFAU
         
         event_type = context.user_data.get('new_event_type', 'Неизвестно')
         
-        await update.message.reply_text(
-            f"✅ Дата последнего события: <b>{date_str}</b>\n\n"
-            f"🔄 Теперь введите интервал в днях\n"
-            f"между событиями '{event_type}'\n\n"
-            f"ℹ️ Примеры: 365 (год), 180 (полгода), 90 (3 месяца)",
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"✅ Дата последнего события: <b>{date_str}</b>\n\n"
+                 f"🔄 Теперь введите интервал в днях\n"
+                 f"между событиями '{event_type}'\n\n"
+                 f"ℹ️ Примеры: 365 (год), 180 (полгода), 90 (3 месяца)",
             parse_mode='HTML'
         )
         
         return ConversationStates.ADD_EVENT_TO_EMPLOYEE_INTERVAL
         
     except ValueError:
-        await update.message.reply_text(
-            "❌ Неверная дата. Проверьте правильность ввода.\n"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверная дата. Проверьте правильность ввода.\n"
             "Формат: ДД.ММ.ГГГГ"
         )
         return ConversationStates.ADD_EVENT_TO_EMPLOYEE_DATE
@@ -972,8 +1252,9 @@ async def add_event_to_employee_interval(update: Update, context: ContextTypes.D
     interval_str = update.message.text.strip()
     
     if not validate_interval(interval_str):
-        await update.message.reply_text(
-            "❌ Неверный интервал.\n"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неверный интервал.\n"
             "Введите число от 1 до 3650."
         )
         return ConversationStates.ADD_EVENT_TO_EMPLOYEE_INTERVAL
@@ -1001,8 +1282,9 @@ async def add_event_to_employee_interval(update: Update, context: ContextTypes.D
             conn.commit()
 
         # Завершаем процесс
-        await update.message.reply_text(
-            f"✅ Событие успешно добавлено сотруднику!\n\n"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"✅ Событие успешно добавлено сотруднику!\n\n"
             f"👤 Сотрудник: <b>{user_data['current_employee_name']}</b>\n"
             f"📝 Событие: <b>{user_data['new_event_type']}</b>\n"
             f"📅 Последнее событие: <b>{last_date.strftime('%d.%m.%Y')}</b>\n"
@@ -1014,8 +1296,9 @@ async def add_event_to_employee_interval(update: Update, context: ContextTypes.D
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"Error saving employee event: {e}")
-        await update.message.reply_text(
-            "❌ Произошла ошибка при сохранении события",
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Произошла ошибка при сохранении события",
             reply_markup=ReplyKeyboardRemove()
         )
         return ConversationHandler.END
@@ -1030,14 +1313,15 @@ async def cancel_add_event_to_employee(update: Update, context: ContextTypes.DEF
     if update.callback_query:
         query = update.callback_query
         await query.answer()
-        # Отправляем новое сообщение вместо редактирования
+        # Отправляем новое сообщение поверх главного меню
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="❌ Добавление события отменено"
         )
     else:
-        await update.message.reply_text(
-            "❌ Добавление события отменено"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Добавление события отменено"
         )
     
     return ConversationHandler.END
