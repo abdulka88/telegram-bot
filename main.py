@@ -279,7 +279,10 @@ def main():
             },
             fallbacks=[
                 CommandHandler('cancel', lambda u, c: cancel_add_employee(u, c))
-            ]
+            ],
+            per_message=False,
+            per_chat=True,
+            per_user=True
         )
         application.add_handler(add_employee_conv)
         
@@ -300,7 +303,10 @@ def main():
             fallbacks=[
                 MessageHandler(filters.Regex(r'^❌ Отмена$'), lambda u, c: cancel_add_employee(u, c)),
                 CommandHandler('cancel', lambda u, c: cancel_add_employee(u, c))
-            ]
+            ],
+            per_message=False,
+            per_chat=True,
+            per_user=True
         )
         application.add_handler(edit_name_conv)
         
@@ -329,7 +335,10 @@ def main():
             fallbacks=[
                 MessageHandler(filters.Regex(r'^❌ Отмена$'), cancel_add_event_to_employee),
                 CommandHandler('cancel', lambda u, c: cancel_add_event_to_employee(u, c))
-            ]
+            ],
+            per_message=False,
+            per_chat=True,
+            per_user=True
         )
         application.add_handler(add_event_to_employee_conv)
         
@@ -366,7 +375,7 @@ def main():
             job_queue.run_daily(
                 automated_reports_manager.send_weekly_analytics_report,
                 time=dt_time(hour=8, minute=0),
-                days=(0,)  # Понедельник
+                days=(0,)  # Понедельник (0 = понедельник в новой версии)
             )
             
             # Месячный отчет (1-е число каждого месяца в 9:00)

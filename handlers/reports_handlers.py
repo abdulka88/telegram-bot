@@ -27,7 +27,11 @@ async def reports_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user_id = update.effective_user.id
     
     if not is_admin(chat_id, user_id):
-        await query.edit_message_text("❌ Только администратор может управлять отчетами")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может управлять отчетами"
+        )
         return
     
     # Получаем текущие настройки
@@ -65,8 +69,10 @@ async def reports_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -128,8 +134,10 @@ async def reports_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -162,8 +170,10 @@ async def request_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -181,9 +191,11 @@ async def generate_daily_report(update: Update, context: ContextTypes.DEFAULT_TY
             context, chat_id, 'daily', user_id
         )
         
-        await query.edit_message_text(
-            "✅ <b>Ежедневный отчет отправлен!</b>\n\n"
-            "📊 Проверьте ваши сообщения",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="✅ <b>Ежедневный отчет отправлен!</b>\n\n"
+                 "📊 Проверьте ваши сообщения",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К отчетам", callback_data=create_callback_data("reports_menu"))
@@ -192,9 +204,11 @@ async def generate_daily_report(update: Update, context: ContextTypes.DEFAULT_TY
         
     except Exception as e:
         logger.error(f"Error generating daily report: {e}")
-        await query.edit_message_text(
-            "❌ <b>Ошибка при генерации отчета</b>\n\n"
-            "Попробуйте позже или обратитесь к администратору",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ <b>Ошибка при генерации отчета</b>\n\n"
+                 "Попробуйте позже или обратитесь к администратору",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К отчетам", callback_data=create_callback_data("reports_menu"))
@@ -214,9 +228,11 @@ async def generate_weekly_report(update: Update, context: ContextTypes.DEFAULT_T
             context, chat_id, 'weekly', user_id
         )
         
-        await query.edit_message_text(
-            "✅ <b>Еженедельный отчет отправлен!</b>\n\n"
-            "📊 Проверьте ваши сообщения",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="✅ <b>Еженедельный отчет отправлен!</b>\n\n"
+                 "📊 Проверьте ваши сообщения",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К отчетам", callback_data=create_callback_data("reports_menu"))
@@ -225,9 +241,11 @@ async def generate_weekly_report(update: Update, context: ContextTypes.DEFAULT_T
         
     except Exception as e:
         logger.error(f"Error generating weekly report: {e}")
-        await query.edit_message_text(
-            "❌ <b>Ошибка при генерации отчета</b>\n\n"
-            "Попробуйте позже или обратитесь к администратору",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ <b>Ошибка при генерации отчета</b>\n\n"
+                 "Попробуйте позже или обратитесь к администратору",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К отчетам", callback_data=create_callback_data("reports_menu"))
@@ -247,9 +265,11 @@ async def generate_monthly_report(update: Update, context: ContextTypes.DEFAULT_
             context, chat_id, 'monthly', user_id
         )
         
-        await query.edit_message_text(
-            "✅ <b>Месячный отчет отправлен!</b>\n\n"
-            "📊 Проверьте ваши сообщения",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="✅ <b>Месячный отчет отправлен!</b>\n\n"
+                 "📊 Проверьте ваши сообщения",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К отчетам", callback_data=create_callback_data("reports_menu"))
@@ -258,9 +278,11 @@ async def generate_monthly_report(update: Update, context: ContextTypes.DEFAULT_
         
     except Exception as e:
         logger.error(f"Error generating monthly report: {e}")
-        await query.edit_message_text(
-            "❌ <b>Ошибка при генерации отчета</b>\n\n"
-            "Попробуйте позже или обратитесь к администратору",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ <b>Ошибка при генерации отчета</b>\n\n"
+                 "Попробуйте позже или обратитесь к администратору",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К отчетам", callback_data=create_callback_data("reports_menu"))
@@ -281,9 +303,11 @@ async def generate_full_report(update: Update, context: ContextTypes.DEFAULT_TYP
         await automated_reports_manager.send_custom_report(context, chat_id, 'weekly', user_id)
         await automated_reports_manager.send_custom_report(context, chat_id, 'monthly', user_id)
         
-        await query.edit_message_text(
-            "✅ <b>Полный отчет отправлен!</b>\n\n"
-            "📊 Проверьте ваши сообщения - отправлены все типы отчетов",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="✅ <b>Полный отчет отправлен!</b>\n\n"
+                 "📊 Проверьте ваши сообщения - отправлены все типы отчетов",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К отчетам", callback_data=create_callback_data("reports_menu"))
@@ -292,9 +316,11 @@ async def generate_full_report(update: Update, context: ContextTypes.DEFAULT_TYP
         
     except Exception as e:
         logger.error(f"Error generating full report: {e}")
-        await query.edit_message_text(
-            "❌ <b>Ошибка при генерации отчета</b>\n\n"
-            "Попробуйте позже или обратитесь к администратору",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ <b>Ошибка при генерации отчета</b>\n\n"
+                 "Попробуйте позже или обратитесь к администратору",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К отчетам", callback_data=create_callback_data("reports_menu"))
@@ -421,9 +447,11 @@ async def test_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             parse_mode='HTML'
         )
         
-        await query.edit_message_text(
-            "✅ <b>Тестовый отчет отправлен!</b>\n\n"
-            "📊 Система работает корректно",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="✅ <b>Тестовый отчет отправлен!</b>\n\n"
+                 "📊 Система работает корректно",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К отчетам", callback_data=create_callback_data("reports_menu"))
@@ -432,9 +460,11 @@ async def test_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         
     except Exception as e:
         logger.error(f"Error sending test report: {e}")
-        await query.edit_message_text(
-            "❌ <b>Ошибка отправки тестового отчета</b>\n\n"
-            "Проверьте настройки системы",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ <b>Ошибка отправки тестового отчета</b>\n\n"
+                 "Проверьте настройки системы",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К отчетам", callback_data=create_callback_data("reports_menu"))

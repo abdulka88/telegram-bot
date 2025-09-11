@@ -26,7 +26,11 @@ async def export_menu_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user_id = update.effective_user.id
     
     if not is_admin(chat_id, user_id):
-        await query.edit_message_text("❌ Только администратор может экспортировать данные")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может экспортировать данные"
+        )
         return
     
     keyboard = [
@@ -43,8 +47,10 @@ async def export_menu_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "Файл будет содержать все события сотрудников с актуальными статусами."
     )
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -58,7 +64,11 @@ async def handle_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     file_format = data.get('format', 'xlsx')
     chat_id = update.effective_chat.id
     
-    await query.edit_message_text("⏳ Подготавливаю файл для экспорта...")
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="⏳ Подготавливаю файл для экспорта..."
+    )
     
     try:
         # Экспортируем данные
@@ -76,11 +86,19 @@ async def handle_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             caption=f"📊 Отчет по событиям от {datetime.now().strftime('%d.%m.%Y %H:%M')}"
         )
         
-        await query.edit_message_text("✅ Файл успешно сформирован и отправлен!")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="✅ Файл успешно сформирован и отправлен!"
+        )
         
     except Exception as e:
         logger.error(f"Export error: {e}")
-        await query.edit_message_text("❌ Ошибка при экспорте данных")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="❌ Ошибка при экспорте данных"
+        )
 
 # Alias for backward compatibility
 export_data_start = export_menu_start

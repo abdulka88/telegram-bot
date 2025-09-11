@@ -29,7 +29,11 @@ async def analytics_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     
     if not is_admin(chat_id, user_id):
-        await query.edit_message_text("❌ Только администратор может просматривать аналитику")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может просматривать аналитику"
+        )
         return
     
     text = (
@@ -62,8 +66,10 @@ async def analytics_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -131,8 +137,10 @@ async def analytics_trends(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -222,8 +230,10 @@ async def analytics_timeline(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -313,8 +323,10 @@ async def analytics_forecast(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -379,8 +391,10 @@ async def analytics_efficiency(update: Update, context: ContextTypes.DEFAULT_TYP
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -486,8 +500,10 @@ async def analytics_summary(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -536,8 +552,10 @@ async def show_monthly_chart(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -586,8 +604,10 @@ async def show_weekly_chart(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -638,8 +658,10 @@ async def show_daily_chart(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -727,8 +749,10 @@ async def advanced_workload_forecast(update: Update, context: ContextTypes.DEFAU
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -827,8 +851,10 @@ async def show_detailed_forecast(update: Update, context: ContextTypes.DEFAULT_T
         ]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -856,7 +882,11 @@ async def analytics_export_excel(update: Update, context: ContextTypes.DEFAULT_T
     user_id = update.effective_user.id
     
     if not is_admin(chat_id, user_id):
-        await query.edit_message_text("❌ Только администратор может экспортировать отчеты")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может экспортировать отчеты"
+        )
         return
     
     try:
@@ -881,9 +911,11 @@ async def analytics_export_excel(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode='HTML'
         )
         
-        await query.edit_message_text(
-            "✅ <b>Excel отчет создан и отправлен!</b>\n\n"
-            "📄 Проверьте ваши файлы",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="✅ <b>Excel отчет создан и отправлен!</b>\n\n"
+                 "📄 Проверьте ваши файлы",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К аналитике", callback_data=create_callback_data("analytics_menu"))
@@ -892,9 +924,11 @@ async def analytics_export_excel(update: Update, context: ContextTypes.DEFAULT_T
         
     except Exception as e:
         logger.error(f"Error exporting analytics to Excel: {e}")
-        await query.edit_message_text(
-            "❌ <b>Ошибка при создании Excel отчета</b>\n\n"
-            "Попробуйте позже или обратитесь к администратору",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ <b>Ошибка при создании Excel отчета</b>\n\n"
+                 "Попробуйте позже или обратитесь к администратору",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 К аналитике", callback_data=create_callback_data("analytics_menu"))

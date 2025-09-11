@@ -11,6 +11,7 @@ from core.utils import create_callback_data, parse_callback_data
 from core.security import is_admin
 from managers.search_manager import SearchManager
 from core.database import db_manager
+from core.security import decrypt_data
 
 # Инициализируем менеджер поиска
 search_manager = SearchManager(db_manager)
@@ -26,7 +27,11 @@ async def search_menu_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user_id = update.effective_user.id
     
     if not is_admin(chat_id, user_id):
-        await query.edit_message_text("❌ Только администратор может использовать поиск")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может использовать поиск"
+        )
         return
     
     # Получаем статистику
@@ -62,8 +67,10 @@ async def search_menu_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         [InlineKeyboardButton("🔙 Главное меню", callback_data=create_callback_data("menu"))]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -88,7 +95,11 @@ async def search_by_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     }
     
     if status not in status_config:
-        await query.edit_message_text("❌ Неизвестный статус")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Неизвестный статус"
+        )
         return
     
     config = status_config[status]
@@ -160,8 +171,10 @@ async def display_search_results(update: Update, context: ContextTypes.DEFAULT_T
             [InlineKeyboardButton("🔙 К поиску", callback_data=create_callback_data("search_menu"))]
         ])
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -218,19 +231,21 @@ async def search_employees(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 InlineKeyboardButton("⬅️ Пред", 
                     callback_data=create_callback_data("search_employees", page=page-1))
             )
-        if end_idx < len(employees):
+        total_pages = (len(employees) + per_page - 1) // per_page
+        if page < total_pages - 1:
             pagination_buttons.append(
                 InlineKeyboardButton("След ➡️", 
                     callback_data=create_callback_data("search_employees", page=page+1))
             )
-        
         if pagination_buttons:
             keyboard.append(pagination_buttons)
-            
+        
         keyboard.append([InlineKeyboardButton("🔙 К поиску", callback_data=create_callback_data("search_menu"))])
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -244,68 +259,81 @@ async def show_employee_events(update: Update, context: ContextTypes.DEFAULT_TYP
     employee_id = data.get('id')
     
     if not employee_id:
-        await query.edit_message_text("❌ Ошибка: ID сотрудника не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: ID сотрудника не найден"
+        )
         return
     
-    chat_id = update.effective_chat.id
-    
-    # Получаем информацию о сотруднике
-    employees = search_manager.search_employees(chat_id)
-    employee = next((e for e in employees if e['id'] == int(employee_id)), None)
+    # Получаем информацию о сотруднике и его событиях
+    employee = db_manager.execute_with_retry('''
+        SELECT full_name, position FROM employees WHERE id = ?
+    ''', (employee_id,), fetch="one")
     
     if not employee:
-        await query.edit_message_text("❌ Сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Сотрудник не найден"
+        )
         return
     
-    # Получаем события сотрудника
-    events = search_manager.get_employee_events(int(employee_id))
+    try:
+        decrypted_name = decrypt_data(employee['full_name'])
+    except ValueError:
+        decrypted_name = "Ошибка дешифрации"
     
+    # Получаем события сотрудника
+    events = db_manager.execute_with_retry('''
+        SELECT event_type, next_notification_date, interval_days
+        FROM employee_events 
+        WHERE employee_id = ? 
+        ORDER BY next_notification_date
+    ''', (employee_id,), fetch="all")
+    
+    # Формируем текст ответа
     text_lines = [
-        f"👤 <b>{employee['full_name']}</b>",
-        f"💼 {employee['position']}",
+        f"👤 <b>События сотрудника</b>\n",
+        f"📝 ФИО: <b>{decrypted_name}</b>",
+        f"💼 Должность: <b>{employee['position']}</b>",
         "",
         "📅 <b>События:</b>"
     ]
     
     if not events:
-        text_lines.append("❌ События не найдены")
+        text_lines.append("ℹ️ Нет событий")
     else:
         for event in events:
-            event_date = datetime.fromisoformat(event['next_notification_date'])
-            days_until = int(event['days_until']) if event['days_until'] else 0
+            event_date = datetime.fromisoformat(event['next_notification_date']).date()
+            days_left = (event_date - datetime.now().date()).days
             
-            # Определяем статус
-            if days_until < 0:
-                status_emoji = "🔴"
-                status_text = f"просрочено на {abs(days_until)} дн."
-            elif days_until <= 3:
-                status_emoji = "🔴" 
-                status_text = f"через {days_until} дн. (критично!)"
-            elif days_until <= 7:
-                status_emoji = "🟠"
-                status_text = f"через {days_until} дн. (срочно)"
-            elif days_until <= 30:
-                status_emoji = "🟡"
-                status_text = f"через {days_until} дн."
+            if days_left < 0:
+                status = f"🔴 просрочено на {abs(days_left)} дн."
+            elif days_left <= 7:
+                status = f"🟠 через {days_left} дн."
             else:
-                status_emoji = "🟢"
-                status_text = f"через {days_until} дн."
+                status = f"🟢 через {days_left} дн."
             
             text_lines.append(
-                f"\n{status_emoji} <b>{event['event_type']}</b>\n"
-                f"   📅 {event_date.strftime('%d.%m.%Y')} ({status_text})\n"
-                f"   🔄 Интервал: {event['interval_days']} дней"
+                f"• <b>{event['event_type']}</b>\n"
+                f"  📅 {event_date.strftime('%d.%m.%Y')} ({status})\n"
+                f"  🔄 Интервал: {event['interval_days']} дней"
             )
     
     text = "\n".join(text_lines)
     
+    # Кнопки действий
     keyboard = [
-        [InlineKeyboardButton("🔙 К списку сотрудников", callback_data=create_callback_data("search_employees"))],
-        [InlineKeyboardButton("🔍 К поиску", callback_data=create_callback_data("search_menu"))]
+        [InlineKeyboardButton("✏️ Редактировать", callback_data=create_callback_data("edit_employee", id=employee_id))],
+        [InlineKeyboardButton("➕ Добавить событие", callback_data=create_callback_data("add_event", id=employee_id))],
+        [InlineKeyboardButton("🔙 К сотрудникам", callback_data=create_callback_data("search_employees"))]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -318,40 +346,39 @@ async def search_by_event_type(update: Update, context: ContextTypes.DEFAULT_TYP
     chat_id = update.effective_chat.id
     
     # Получаем все типы событий
-    event_types = search_manager.get_available_event_types(chat_id)
+    event_types = search_manager.get_all_event_types(chat_id)
     
     if not event_types:
         text = "📋 <b>Поиск по типу события</b>\n\n❌ Типы событий не найдены"
         keyboard = [[InlineKeyboardButton("🔙 К поиску", callback_data=create_callback_data("search_menu"))]]
     else:
-        text = (
-            "📋 <b>Поиск по типу события</b>\n\n"
-            "Выберите тип события для поиска:"
-        )
+        text = "📋 <b>Поиск по типу события</b>\n\nВыберите тип события:"
         
-        # Создаем кнопки для каждого типа события
+        # Создаем кнопки с типами событий (по 2 в ряд)
         keyboard = []
-        for event_type in event_types:
-            # Обрезаем название если слишком длинное
-            display_name = event_type
-            if len(display_name) > 35:
-                display_name = display_name[:32] + "..."
-            
-            keyboard.append([InlineKeyboardButton(
-                f"📋 {display_name}",
-                callback_data=create_callback_data("search_event_type", type=event_type[:50])  # Ограничиваем для callback_data
-            )])
+        for i in range(0, len(event_types), 2):
+            row = []
+            for j in range(2):
+                if i + j < len(event_types):
+                    event_type = event_types[i + j]
+                    row.append(InlineKeyboardButton(
+                        event_type,
+                        callback_data=create_callback_data("search_event_type", type=event_type)
+                    ))
+            keyboard.append(row)
         
         keyboard.append([InlineKeyboardButton("🔙 К поиску", callback_data=create_callback_data("search_menu"))])
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
 
 async def search_events_by_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показывает события определенного типа"""
+    """Поиск событий по конкретному типу"""
     query = update.callback_query
     await query.answer()
     
@@ -360,12 +387,16 @@ async def search_events_by_type(update: Update, context: ContextTypes.DEFAULT_TY
     page = data.get('page', 0)
     
     if not event_type:
-        await query.edit_message_text("❌ Тип события не указан")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Тип события не указан"
+        )
         return
     
     chat_id = update.effective_chat.id
     
-    # Поиск по типу события
+    # Выполняем поиск
     results = await search_manager.search_events(
         chat_id=chat_id,
         query="",
@@ -374,37 +405,23 @@ async def search_events_by_type(update: Update, context: ContextTypes.DEFAULT_TY
         per_page=5
     )
     
-    title = f"📋 {event_type}"
-    await display_search_results(update, context, results, title, f"event_type_{event_type[:20]}", page)
+    await display_search_results(update, context, results, f"События типа: {event_type}", f"type_{event_type}", page)
 
 async def text_search_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Начало текстового поиска"""
+    """Начало текстового поиска с популярными запросами"""
     query = update.callback_query
     await query.answer()
     
     chat_id = update.effective_chat.id
     
     # Получаем популярные поисковые запросы
-    popular_searches = search_manager.get_popular_searches(chat_id)
+    popular_searches = search_manager.get_popular_searches(chat_id, limit=8)
     
     text_lines = [
-        "🔍 <b>Текстовый поиск</b>",
+        "🔤 <b>Текстовый поиск</b>",
         "",
-        "💡 <b>Что можно искать:</b>",
-        "👤 ФИО сотрудника: \"Иванов\", \"Петров\"\n",
-        "💼 Должность: \"плотник\", \"маляр\"\n",
-        "📋 Тип события: \"медосмотр\", \"инструктаж\"\n",
-        "",
-        "⚡ <b>Напишите поисковый запрос:</b>"
+        "Введите поисковый запрос (ФИО сотрудника, должность, тип события):"
     ]
-    
-    if popular_searches:
-        text_lines.insert(-1, "🔥 <b>Популярные запросы:</b>")
-        for search in popular_searches[:3]:
-            text_lines.insert(-1, f"• {search}")
-        text_lines.insert(-1, "")
-    
-    text = "\n".join(text_lines)
     
     # Кнопки с популярными запросами
     keyboard = []
@@ -421,8 +438,10 @@ async def text_search_start(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         [InlineKeyboardButton("🔙 К поиску", callback_data=create_callback_data("search_menu"))]
     ])
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="\n".join(text_lines),
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -464,7 +483,11 @@ async def quick_text_search(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if search_query:
         await perform_text_search(update, context, search_query, 0)
     else:
-        await query.edit_message_text("❌ Ошибка: поисковый запрос не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: поисковый запрос не найден"
+        )
 
 async def perform_text_search(update: Update, context: ContextTypes.DEFAULT_TYPE, search_query: str, page: int = 0) -> None:
     """Выполняет текстовый поиск и отображает результаты"""
@@ -472,7 +495,11 @@ async def perform_text_search(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # Показываем индикатор поиска
     if hasattr(update, 'callback_query') and update.callback_query:
-        await update.callback_query.edit_message_text("🔍 Поиск...")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="🔍 Поиск..."
+        )
     else:
         search_msg = await update.message.reply_text("🔍 Поиск...")
     
@@ -492,14 +519,12 @@ async def perform_text_search(update: Update, context: ContextTypes.DEFAULT_TYPE
         error_text = "❌ Ошибка при выполнении поиска"
         keyboard = [[InlineKeyboardButton("🔙 К поиску", callback_data=create_callback_data("search_menu"))]]
         
-        if hasattr(update, 'callback_query') and update.callback_query:
-            await update.callback_query.edit_message_text(
-                error_text, reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        else:
-            await update.message.reply_text(
-                error_text, reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=error_text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 async def display_text_search_results(update: Update, context: ContextTypes.DEFAULT_TYPE, results: dict, query: str, page: int) -> None:
     """Отображает результаты текстового поиска"""
@@ -590,19 +615,13 @@ async def display_text_search_results(update: Update, context: ContextTypes.DEFA
     
     text = "\n".join(text_lines)
     
-    # Отправляем результат
-    if hasattr(update, 'callback_query') and update.callback_query:
-        await update.callback_query.edit_message_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='HTML'
-        )
-    else:
-        await update.message.reply_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='HTML'
-        )
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='HTML'
+    )
 
 async def text_search_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработка пагинации в текстовом поиске"""
@@ -616,4 +635,8 @@ async def text_search_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if search_query:
         await perform_text_search(update, context, search_query, page)
     else:
-        await query.edit_message_text("❌ Ошибка: параметры поиска потеряны")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: параметры поиска потеряны"
+        )

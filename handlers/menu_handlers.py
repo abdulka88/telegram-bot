@@ -1,62 +1,85 @@
 """
-Обработчики меню и навигации
+Обработчики главного меню и навигации
 """
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from core.security import is_admin
 from core.utils import create_callback_data, parse_callback_data
+from core.security import is_admin
+from core.database import db_manager
 
+# Setup logging
 logger = logging.getLogger(__name__)
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показывает главное меню с доступными функциями"""
+    """Показывает главное меню бота"""
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-
+    
+    # Проверяем права администратора
+    user_is_admin = is_admin(chat_id, user_id)
+    
+    # Создаем клавиатуру меню
     keyboard = [
-        [InlineKeyboardButton("📅 Мои события", callback_data=create_callback_data("my_events"))]
+        [InlineKeyboardButton("📅 Мои события", callback_data=create_callback_data("my_events"))],
     ]
-
-    if is_admin(chat_id, user_id):
+    
+    if user_is_admin:
         admin_buttons = [
             [
-                InlineKeyboardButton("📊 Дашборд", callback_data=create_callback_data("dashboard")),
-                InlineKeyboardButton("🔍 Поиск", callback_data=create_callback_data("search_menu"))
+                InlineKeyboardButton("👥 Сотрудники", callback_data=create_callback_data("list_employees")),
+                InlineKeyboardButton("👨‍💼 Добавить сотрудника", callback_data=create_callback_data("add_employee"))
             ],
             [
-                InlineKeyboardButton("👨‍💼 Добавить сотрудника", callback_data=create_callback_data("add_employee")),
-                InlineKeyboardButton("📋 Список сотрудников", callback_data=create_callback_data("list_employees"))
+                InlineKeyboardButton("🔍 Поиск", callback_data=create_callback_data("search_menu")),
+                InlineKeyboardButton("📊 Дашборд", callback_data=create_callback_data("dashboard"))
             ],
             [
-                InlineKeyboardButton("📊 Все события", callback_data=create_callback_data("all_events")),
+                InlineKeyboardButton("📋 Шаблоны", callback_data=create_callback_data("templates")),
                 InlineKeyboardButton("📁 Экспорт", callback_data=create_callback_data("export_menu"))
             ],
             [
                 InlineKeyboardButton("⚙️ Настройки", callback_data=create_callback_data("settings")),
-                InlineKeyboardButton("❓ Справка", callback_data=create_callback_data("help"))
+                InlineKeyboardButton("🤖 Отчеты", callback_data=create_callback_data("reports_menu"))
             ]
         ]
         keyboard.extend(admin_buttons)
-    else:
-        keyboard.append([
-            InlineKeyboardButton("❓ Справка", callback_data=create_callback_data("help"))
-        ])
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    keyboard.append([InlineKeyboardButton("📚 Помощь", callback_data=create_callback_data("help"))])
     
     menu_text = (
-        "🏠 <b>Главное меню</b>\n\n"
+        "🤖 <b>Telegram Бот управления периодическими событиями</b>\n\n"
         "Добро пожаловать в систему управления периодическими событиями сотрудников!\n\n"
-        "Выберите нужное действие из меню ниже:"
+        "📅 <b>Основные функции:</b>\n"
+        "• Отслеживание периодических событий (медосмотры, инструктажи и т.д.)\n"
+        "• Автоматические уведомления за 90/30/7/1-3 дня до события\n"
+        "• Расширенная аналитика и прогнозирование\n"
+        "• Экспорт данных в Excel/CSV\n"
+        "• Управление шаблонами событий по должностям\n\n"
+    )
+    
+    if user_is_admin:
+        menu_text += (
+            "👨‍💼 <b>Функции администратора:</b>\n"
+            "• Управление сотрудниками и их событиями\n"
+            "• Расширенный поиск и фильтрация\n"
+            "• Дашборд с аналитикой в реальном времени\n"
+            "• Настройка системы уведомлений\n"
+            "• Автоматические отчеты\n\n"
+        )
+    
+    menu_text += "Выберите действие из меню ниже:"
+    
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=menu_text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='HTML'
     )
 
-    if update.message:
-        await update.message.reply_text(menu_text, reply_markup=reply_markup, parse_mode='HTML')
-    elif update.callback_query:
-        await update.callback_query.edit_message_text(menu_text, reply_markup=reply_markup, parse_mode='HTML')
 
 async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Основной обработчик callback-запросов меню"""
@@ -83,7 +106,11 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         
         if not action:
             logger.warning("❌ Не найдено действие в callback данных")
-            await query.edit_message_text("❌ Неизвестная команда")
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="❌ Неизвестная команда"
+            )
             return
         
         logger.info(f"🎯 Выполняется действие: {action}")
@@ -356,13 +383,21 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             
         else:
             logger.warning(f"❌ Неизвестное действие: {action}")
-            await query.edit_message_text("❌ Неизвестная команда")
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="❌ Неизвестная команда"
+            )
             
     except Exception as e:
         logger.error(f"Error in menu_handler: {e}", exc_info=True)
         logger.error(f"Update details: {update}")
         logger.error(f"Context details: {context}")
-        await query.edit_message_text("❌ Произошла ошибка при обработке команды")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Произошла ошибка при обработке команды"
+        )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает справку по командам"""
@@ -429,7 +464,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if update.message:
         await update.message.reply_text(help_text, reply_markup=reply_markup, parse_mode='HTML')
     else:
-        await update.callback_query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode='HTML')
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=help_text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
 
 async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает меню настроек"""
@@ -440,7 +481,11 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user_id = update.effective_user.id
 
     if not is_admin(chat_id, user_id):
-        await query.edit_message_text("❌ Только администратор может изменять настройки")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может изменять настройки"
+        )
         return
 
     keyboard = [
@@ -457,8 +502,10 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "Выберите параметр для изменения:"
     )
 
-    await query.edit_message_text(
-        settings_text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=settings_text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )

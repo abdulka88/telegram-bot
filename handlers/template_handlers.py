@@ -25,7 +25,11 @@ async def templates_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = update.effective_user.id
     
     if not is_admin(chat_id, user_id):
-        await query.edit_message_text("❌ Только администратор может использовать шаблоны")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может использовать шаблоны"
+        )
         return
     
     # Получаем список доступных шаблонов
@@ -52,8 +56,10 @@ async def templates_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if len(templates) > 5:
         text += f"• ... и еще {len(templates) - 5} шаблонов\n"
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -67,13 +73,21 @@ async def select_employee_for_template(update: Update, context: ContextTypes.DEF
     template_key = data.get('key')
     
     if not template_key:
-        await query.edit_message_text("❌ Ошибка: шаблон не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: шаблон не найден"
+        )
         return
     
     # Получаем информацию о шаблоне
     template_info = template_manager.get_template_info(template_key)
     if not template_info:
-        await query.edit_message_text("❌ Ошибка: шаблон не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: шаблон не найден"
+        )
         return
     
     context.user_data['selected_template'] = template_key
@@ -93,7 +107,11 @@ async def select_employee_for_template(update: Update, context: ContextTypes.DEF
             employees = cursor.fetchall()
         
         if not employees:
-            await query.edit_message_text("❌ Нет активных сотрудников")
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="❌ Нет активных сотрудников"
+            )
             return
         
         text = (
@@ -116,15 +134,21 @@ async def select_employee_for_template(update: Update, context: ContextTypes.DEF
         
         keyboard.append([InlineKeyboardButton("🔙 К шаблонам", callback_data=create_callback_data("templates"))])
         
-        await query.edit_message_text(
-            text,
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=text,
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='HTML'
         )
         
     except Exception as e:
         logger.error(f"Error selecting employee for template: {e}")
-        await query.edit_message_text("❌ Ошибка при получении списка сотрудников")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка при получении списка сотрудников"
+        )
 
 async def apply_template_to_employee(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Применение шаблона к сотруднику"""
@@ -136,10 +160,18 @@ async def apply_template_to_employee(update: Update, context: ContextTypes.DEFAU
     template_key = context.user_data.get('selected_template')
     
     if not employee_id or not template_key:
-        await query.edit_message_text("❌ Ошибка: недостаточно данных")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: недостаточно данных"
+        )
         return
     
-    await query.edit_message_text("⏳ Применяю шаблон...")
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="⏳ Применяю шаблон..."
+    )
     
     try:
         # Применяем шаблон
@@ -147,16 +179,26 @@ async def apply_template_to_employee(update: Update, context: ContextTypes.DEFAU
         
         if success:
             template_info = template_manager.get_template_info(template_key)
-            await query.edit_message_text(
-                f"✅ <b>Шаблон успешно применен!</b>\n\n"
-                f"📋 Шаблон: {template_info['name']}\n"
-                f"📊 Добавлено событий: {template_info['events_count']}\n\n"
-                f"Все события автоматически добавлены в календарь сотрудника.",
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"✅ <b>Шаблон успешно применен!</b>\n\n"
+                     f"📋 Шаблон: {template_info['name']}\n"
+                     f"📊 Добавлено событий: {template_info['events_count']}\n\n"
+                     f"Все события автоматически добавлены в календарь сотрудника.",
                 parse_mode='HTML'
             )
         else:
-            await query.edit_message_text("❌ Ошибка при применении шаблона")
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="❌ Ошибка при применении шаблона"
+            )
         
     except Exception as e:
         logger.error(f"Error applying template: {e}")
-        await query.edit_message_text("❌ Произошла ошибка при применении шаблона")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Произошла ошибка при применении шаблона"
+        )

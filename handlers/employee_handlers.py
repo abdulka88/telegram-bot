@@ -44,34 +44,26 @@ async def add_employee_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not is_admin(chat_id, user_id):
         logger.warning(f"❌ Пользователь {user_id} не является администратором")
         if query:
-            await query.edit_message_text("❌ Только администратор может добавлять сотрудников")
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="❌ Только администратор может добавлять сотрудников"
+            )
         else:
             await update.message.reply_text("❌ Только администратор может добавлять сотрудников")
         return ConversationHandler.END
     
     logger.info(f"✅ Проверка администратора пройдена")
 
-    # Создаем клавиатуру с вариантами действий
-    keyboard = [
-        [KeyboardButton("📱 Отправить контакт", request_contact=True)],
-        [KeyboardButton("❌ Отмена")]
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
-    logger.info(f"⌨️ Клавиатура создана с {len(keyboard)} кнопками")
-
-    # Отправляем сообщение с запросом
+    # Отправляем сообщение с запросом ФИО без клавиатуры
     logger.info(f"📤 Отправляем сообщение с запросом ФИО...")
     if query:
-        await query.edit_message_text(
-            "Введите ФИО сотрудника или отправьте контакт:",
-            reply_markup=reply_markup
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Введите ФИО сотрудника:"
         )
     else:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="Введите ФИО сотрудника или отправьте контакт:",
-            reply_markup=reply_markup
-        )
+        await update.message.reply_text("Введите ФИО сотрудника:")
+        
     logger.info(f"✅ Сообщение отправлено, переходим в состояние ADD_NAME")
     return ConversationStates.ADD_NAME
 
@@ -158,37 +150,19 @@ async def show_position_selection(update: Update, context: ContextTypes.DEFAULT_
     # Получаем имя сотрудника из контекста или используем значение по умолчанию
     full_name = context.user_data.get('full_name', 'Неизвестный сотрудник')
     
-    # Отправляем сообщение с инлайн клавиатурой и удаляем обычную клавиатуру
+    # Отправляем сообщение с инлайн клавиатурой
     try:
         logger.info(f"📤 Отправляем сообщение с клавиатурой...")
-        # Удаляем обычную клавиатуру и отправляем сообщение с инлайн клавиатурой
-        # Handle both message and callback query updates
-        if hasattr(update, 'callback_query') and update.callback_query:
-            # If called from a callback query, edit the message
-            await update.callback_query.edit_message_text(
-                f"👤 Сотрудник: <b>{full_name}</b>\n\n"
-                "💼 Выберите должность:",
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
-        elif hasattr(update, 'message') and update.message:
-            # If called from a message, reply to it and remove the regular keyboard
-            await update.message.reply_text(
-                f"👤 Сотрудник: <b>{full_name}</b>\n\n"
-                "💼 Выберите должность:",
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
-        else:
-            # Fallback: send a new message
-            chat_id = update.effective_chat.id
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"👤 Сотрудник: <b>{full_name}</b>\n\n"
-                     "💼 Выберите должность:",
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
+        chat_id = update.effective_chat.id
+        
+        # Отправляем новое сообщение с инлайн клавиатурой
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"👤 Сотрудник: <b>{full_name}</b>\n\n"
+                 "💼 Выберите должность:",
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
         logger.info(f"✅ Основное сообщение отправлено")
         
     except Exception as e:
@@ -218,7 +192,11 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
     
     if not position:
         logger.warning("❌ No position in callback data")
-        await query.edit_message_text("❌ Ошибка при выборе должности")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка при выборе должности"
+        )
         return ConversationHandler.END
     
     user_data = context.user_data
@@ -228,7 +206,11 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
     # Проверяем, что у нас есть имя сотрудника
     if not full_name:
         logger.warning("❌ No full name in user data")
-        await query.edit_message_text("❌ Ошибка: не указано имя сотрудника")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: не указано имя сотрудника"
+        )
         return ConversationHandler.END
     
     user_id = user_data.get('user_id')
@@ -257,18 +239,21 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
         template_applied = await template_manager.apply_template_by_position(employee_id, position)
         logger.info(f"   Template applied: {template_applied}")
 
+        # Отправляем новое сообщение вместо редактирования
         if template_applied:
-            await query.edit_message_text(
-                f"✅ Сотрудник <b>{full_name}</b> с должностью <b>{position}</b> успешно добавлен!\n\n"
-                f"🎯 Автоматически применен шаблон событий для данной должности.\n"
-                f"📅 Все необходимые события добавлены в календарь.",
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"✅ Сотрудник <b>{full_name}</b> с должностью <b>{position}</b> успешно добавлен!\n\n"
+                     f"🎯 Автоматически применен шаблон событий для данной должности.\n"
+                     f"📅 Все необходимые события добавлены в календарь.",
                 parse_mode='HTML'
             )
         else:
             # Если не удалось применить шаблон, переходим к ручному добавлению события
-            await query.edit_message_text(
-                f"✅ Сотрудник <b>{full_name}</b> с должностью <b>{position}</b> успешно добавлен!\n\n"
-                "📅 Введите тип периодического события (например, 'Медосмотр' / 'Проверка знаний П-1' и т.д.):",
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"✅ Сотрудник <b>{full_name}</b> с должностью <b>{position}</b> успешно добавлен!\n\n"
+                     "📅 Введите тип периодического события (например, 'Медосмотр' / 'Проверка знаний П-1' и т.д.):",
                 parse_mode='HTML'
             )
             return ConversationStates.ADD_EVENT_TYPE
@@ -277,11 +262,19 @@ async def handle_position_selection(update: Update, context: ContextTypes.DEFAUL
         
     except sqlite3.IntegrityError as e:
         logger.error(f"SQLite integrity error: {e}")
-        await query.edit_message_text("❌ Сотрудник с таким именем уже существует")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Сотрудник с таким именем уже существует"
+        )
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"Error saving employee: {e}", exc_info=True)
-        await query.edit_message_text("❌ Произошла ошибка при сохранении сотрудника")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Произошла ошибка при сохранении сотрудника"
+        )
         return ConversationHandler.END
 
 async def add_event_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -361,7 +354,11 @@ async def cancel_add_employee(update: Update, context: ContextTypes.DEFAULT_TYPE
     if update.callback_query:
         query = update.callback_query
         await query.answer()
-        await query.edit_message_text("❌ Добавление сотрудника отменено")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Добавление сотрудника отменено"
+        )
     else:
         await update.message.reply_text(
             "❌ Добавление сотрудника отменено",
@@ -378,7 +375,10 @@ async def list_employees(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not is_admin(chat_id, user_id):
         if update.callback_query:
             await update.callback_query.answer()
-            await update.callback_query.edit_message_text("❌ Только администратор может просматривать список сотрудников.")
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="❌ Только администратор может просматривать список сотрудников."
+            )
         return
 
     from config.settings import BotConfig
@@ -412,7 +412,11 @@ async def list_employees(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             response = "ℹ️ Список сотрудников пуст. Добавьте первого сотрудника!"
             if update.callback_query:
                 await update.callback_query.answer()
-                await update.callback_query.edit_message_text(response)
+                # Отправляем новое сообщение вместо редактирования
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=response
+                )
             return
 
         # Формирование сообщения
@@ -471,8 +475,10 @@ async def list_employees(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         else:
             query = update.callback_query
             await query.answer()
-            await query.edit_message_text(
-                "\n".join(response),
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="\n".join(response),
                 reply_markup=reply_markup,
                 parse_mode='HTML'
             )
@@ -488,7 +494,11 @@ async def list_employees(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         else:
             query = update.callback_query
             await query.answer()
-            await query.edit_message_text(error_msg)
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=error_msg
+            )
 
 async def view_employee_details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает детали сотрудника и его события"""
@@ -504,7 +514,11 @@ async def edit_employee_start(update: Update, context: ContextTypes.DEFAULT_TYPE
     employee_id = data.get('id')
     
     if not employee_id:
-        await query.edit_message_text("❌ Ошибка: сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: сотрудник не найден"
+        )
         return
     
     # Получаем данные сотрудника
@@ -513,7 +527,11 @@ async def edit_employee_start(update: Update, context: ContextTypes.DEFAULT_TYPE
     ''', (employee_id,), fetch="one")
     
     if not employee:
-        await query.edit_message_text("❌ Сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Сотрудник не найден"
+        )
         return
     
     try:
@@ -536,8 +554,10 @@ async def edit_employee_start(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"Выберите действие:"
     )
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -551,7 +571,11 @@ async def edit_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
     employee_id = data.get('id')
     
     if not employee_id:
-        await query.edit_message_text("❌ Ошибка: сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: сотрудник не найден"
+        )
         return ConversationHandler.END
     
     # Получаем текущие данные
@@ -560,7 +584,11 @@ async def edit_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
     ''', (employee_id,), fetch="one")
     
     if not employee:
-        await query.edit_message_text("❌ Сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Сотрудник не найден"
+        )
         return ConversationHandler.END
     
     try:
@@ -692,7 +720,11 @@ async def edit_employee_position(update: Update, context: ContextTypes.DEFAULT_T
     employee_id = data.get('id')
     
     if not employee_id:
-        await query.edit_message_text("❌ Ошибка: сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: сотрудник не найден"
+        )
         return
     
     # Получаем текущие данные сотрудника
@@ -701,7 +733,11 @@ async def edit_employee_position(update: Update, context: ContextTypes.DEFAULT_T
     ''', (employee_id,), fetch="one")
     
     if not employee:
-        await query.edit_message_text("❌ Сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Сотрудник не найден"
+        )
         return
     
     try:
@@ -733,8 +769,10 @@ async def edit_employee_position(update: Update, context: ContextTypes.DEFAULT_T
         f"Выберите новую должность:"
     )
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -749,7 +787,11 @@ async def save_employee_position(update: Update, context: ContextTypes.DEFAULT_T
     new_position = data.get('pos')
     
     if not employee_id or not new_position:
-        await query.edit_message_text("❌ Ошибка: недостаточно данных")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: недостаточно данных"
+        )
         return
     
     try:
@@ -759,7 +801,11 @@ async def save_employee_position(update: Update, context: ContextTypes.DEFAULT_T
         ''', (employee_id,), fetch="one")
         
         if not employee:
-            await query.edit_message_text("❌ Сотрудник не найден")
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="❌ Сотрудник не найден"
+            )
             return
             
         old_position = employee['position']
@@ -771,11 +817,13 @@ async def save_employee_position(update: Update, context: ContextTypes.DEFAULT_T
         
         # Если должность не изменилась
         if old_position == new_position:
-            await query.edit_message_text(
-                f"ℹ️ <b>Должность не изменена</b>\n\n"
-                f"👤 Сотрудник: <b>{decrypted_name}</b>\n"
-                f"💼 Должность: <b>{new_position}</b>\n\n"
-                f"Должность уже была установлена.",
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"ℹ️ <b>Должность не изменена</b>\n\n"
+                     f"👤 Сотрудник: <b>{decrypted_name}</b>\n"
+                     f"💼 Должность: <b>{new_position}</b>\n\n"
+                     f"Должность уже была установлена.",
                 parse_mode='HTML'
             )
             return
@@ -789,22 +837,26 @@ async def save_employee_position(update: Update, context: ContextTypes.DEFAULT_T
         template_applied = await template_manager.apply_template_by_position(employee_id, new_position)
         
         if template_applied:
-            await query.edit_message_text(
-                f"✅ <b>Должность изменена и шаблон применен!</b>\n\n"
-                f"👤 Сотрудник: <b>{decrypted_name}</b>\n"
-                f"💼 Старая должность: <b>{old_position}</b>\n"
-                f"💼 Новая должность: <b>{new_position}</b>\n\n"
-                f"🎯 Автоматически применен шаблон событий для должности <b>{new_position}</b>.\n"
-                f"📅 Все необходимые события добавлены в календарь.",
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"✅ <b>Должность изменена и шаблон применен!</b>\n\n"
+                     f"👤 Сотрудник: <b>{decrypted_name}</b>\n"
+                     f"💼 Старая должность: <b>{old_position}</b>\n"
+                     f"💼 Новая должность: <b>{new_position}</b>\n\n"
+                     f"🎯 Автоматически применен шаблон событий для должности <b>{new_position}</b>.\n"
+                     f"📅 Все необходимые события добавлены в календарь.",
                 parse_mode='HTML'
             )
         else:
-            await query.edit_message_text(
-                f"✅ <b>Должность изменена!</b>\n\n"
-                f"👤 Сотрудник: <b>{decrypted_name}</b>\n"
-                f"💼 Старая должность: <b>{old_position}</b>\n"
-                f"💼 Новая должность: <b>{new_position}</b>\n\n"
-                f"ℹ️ Шаблон для данной должности не найден или уже применен.",
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"✅ <b>Должность изменена!</b>\n\n"
+                     f"👤 Сотрудник: <b>{decrypted_name}</b>\n"
+                     f"💼 Старая должность: <b>{old_position}</b>\n"
+                     f"💼 Новая должность: <b>{new_position}</b>\n\n"
+                     f"ℹ️ Шаблон для данной должности не найден или уже применен.",
                 parse_mode='HTML'
             )
         
@@ -813,7 +865,11 @@ async def save_employee_position(update: Update, context: ContextTypes.DEFAULT_T
         
     except Exception as e:
         logger.error(f"Error updating employee position: {e}")
-        await query.edit_message_text("❌ Ошибка при обновлении должности")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка при обновлении должности"
+        )
 
 async def add_event_to_employee(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Начало добавления события существующему сотруднику"""
@@ -824,35 +880,27 @@ async def add_event_to_employee(update: Update, context: ContextTypes.DEFAULT_TY
     employee_id = data.get('id')
     
     if not employee_id:
-        await query.edit_message_text("❌ Ошибка: сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: сотрудник не найден"
+        )
         return ConversationHandler.END
     
-    # Получаем данные сотрудника
-    employee = db_manager.execute_with_retry('''
-        SELECT full_name, position FROM employees WHERE id = ?
-    ''', (employee_id,), fetch="one")
-    
-    if not employee:
-        await query.edit_message_text("❌ Сотрудник не найден")
-        return ConversationHandler.END
-    
-    try:
-        decrypted_name = decrypt_data(employee['full_name'])
-    except ValueError:
-        decrypted_name = "Ошибка дешифрации"
-    
-    # Сохраняем данные в контексте
+    # Сохраняем ID сотрудника в контексте
     context.user_data['current_employee_id'] = employee_id
-    context.user_data['current_employee_name'] = decrypted_name
-    context.user_data['current_employee_position'] = employee['position']
     
-    await query.edit_message_text(
-        f"📅 <b>Добавление события</b>\n\n"
-        f"👤 Сотрудник: <b>{decrypted_name}</b>\n"
-        f"💼 Должность: <b>{employee['position']}</b>\n\n"
-        f"📝 Напишите название события\n"
-        f"ℹ️ Примеры: Медосмотр, Обучение по ОТ, Продление удостоверения",
-        parse_mode='HTML'
+    # Создаем клавиатуру с кнопкой отмены
+    keyboard = [
+        [KeyboardButton("❌ Отмена")]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    
+    # Отправляем сообщение с запросом
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Введите тип периодического события (например, 'Медосмотр' / 'Проверка знаний П-1' и т.д.):",
+        reply_markup=reply_markup
     )
     
     return ConversationStates.ADD_EVENT_TO_EMPLOYEE_TYPE
@@ -982,7 +1030,11 @@ async def cancel_add_event_to_employee(update: Update, context: ContextTypes.DEF
     if update.callback_query:
         query = update.callback_query
         await query.answer()
-        await query.edit_message_text("❌ Добавление события отменено")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Добавление события отменено"
+        )
     else:
         await update.message.reply_text(
             "❌ Добавление события отменено"
@@ -999,7 +1051,11 @@ async def delete_employee(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     employee_id = data.get('id')
     
     if not employee_id:
-        await query.edit_message_text("❌ Ошибка: сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: сотрудник не найден"
+        )
         return
     
     # Получаем данные сотрудника
@@ -1008,7 +1064,11 @@ async def delete_employee(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     ''', (employee_id,), fetch="one")
     
     if not employee:
-        await query.edit_message_text("❌ Сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Сотрудник не найден"
+        )
         return
     
     try:
@@ -1039,8 +1099,10 @@ async def delete_employee(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         f"Вы уверены?"
     )
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -1054,7 +1116,11 @@ async def confirm_delete_employee(update: Update, context: ContextTypes.DEFAULT_
     employee_id = data.get('id')
     
     if not employee_id:
-        await query.edit_message_text("❌ Ошибка: сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: сотрудник не найден"
+        )
         return
     
     # Получаем данные сотрудника для логирования
@@ -1063,7 +1129,11 @@ async def confirm_delete_employee(update: Update, context: ContextTypes.DEFAULT_
     ''', (employee_id,), fetch="one")
     
     if not employee:
-        await query.edit_message_text("❌ Сотрудник не найден")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Сотрудник не найден"
+        )
         return
     
     try:
@@ -1087,12 +1157,14 @@ async def confirm_delete_employee(update: Update, context: ContextTypes.DEFAULT_
             DELETE FROM employees WHERE id = ?
         ''', (employee_id,))
         
-        await query.edit_message_text(
-            f"✅ <b>Сотрудник успешно удален</b>\n\n"
-            f"👤 Удален: <b>{decrypted_name}</b>\n"
-            f"💼 Должность: <b>{employee['position']}</b>\n"
-            f"📅 Удалено событий: <b>{events_count} шт.</b>\n\n"
-            f"🗑️ Все данные безвозвратно удалены из системы.",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"✅ <b>Сотрудник успешно удален</b>\n\n"
+                 f"👤 Удален: <b>{decrypted_name}</b>\n"
+                 f"💼 Должность: <b>{employee['position']}</b>\n"
+                 f"📅 Удалено событий: <b>{events_count} шт.</b>\n\n"
+                 f"🗑️ Все данные безвозвратно удалены из системы.",
             parse_mode='HTML'
         )
         
@@ -1101,10 +1173,12 @@ async def confirm_delete_employee(update: Update, context: ContextTypes.DEFAULT_
         
     except Exception as e:
         logger.error(f"Error deleting employee {employee_id}: {e}")
-        await query.edit_message_text(
-            f"❌ <b>Ошибка при удалении</b>\n\n"
-            f"Произошла ошибка при удалении сотрудника.\n"
-            f"Обратитесь к администратору.",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"❌ <b>Ошибка при удалении</b>\n\n"
+                 f"Произошла ошибка при удалении сотрудника.\n"
+                 f"Обратитесь к администратору.",
             parse_mode='HTML'
         )
 

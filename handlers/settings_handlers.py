@@ -22,7 +22,11 @@ async def set_notification_days(update: Update, context: ContextTypes.DEFAULT_TY
     user_id = update.effective_user.id
     
     if not is_admin(chat_id, user_id):
-        await query.edit_message_text("❌ Только администратор может изменять настройки")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может изменять настройки"
+        )
         return
     
     # Получаем текущие настройки
@@ -47,8 +51,10 @@ async def set_notification_days(update: Update, context: ContextTypes.DEFAULT_TY
         f"Выберите период:"
     )
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -63,7 +69,11 @@ async def save_notification_days(update: Update, context: ContextTypes.DEFAULT_T
     chat_id = update.effective_chat.id
     
     if not days:
-        await query.edit_message_text("❌ Ошибка: неверное значение дней")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: неверное значение дней"
+        )
         return
     
     try:
@@ -73,16 +83,22 @@ async def save_notification_days(update: Update, context: ContextTypes.DEFAULT_T
             WHERE chat_id = ?
         ''', (days, chat_id))
         
-        await query.edit_message_text(
-            f"✅ <b>Настройки сохранены!</b>\n\n"
-            f"⏰ Дни уведомлений: <b>{days} дней</b>\n\n"
-            f"Теперь первые уведомления будут отправляться за {days} дней до события.",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"✅ <b>Настройки сохранены!</b>\n\n"
+                 f"⏰ Дни уведомлений: <b>{days} дней</b>\n\n"
+                 f"Теперь первые уведомления будут отправляться за {days} дней до события.",
             parse_mode='HTML'
         )
         
     except Exception as e:
         logger.error(f"Error saving notification days: {e}")
-        await query.edit_message_text("❌ Ошибка при сохранении настроек")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка при сохранении настроек"
+        )
 
 async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Настройка часового пояса"""
@@ -93,7 +109,11 @@ async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user_id = update.effective_user.id
     
     if not is_admin(chat_id, user_id):
-        await query.edit_message_text("❌ Только администратор может изменять настройки")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может изменять настройки"
+        )
         return
     
     # Получаем текущие настройки
@@ -118,8 +138,10 @@ async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"Выберите часовой пояс для корректного времени уведомлений:"
     )
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -134,7 +156,11 @@ async def save_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     chat_id = update.effective_chat.id
     
     if not timezone:
-        await query.edit_message_text("❌ Ошибка: неверный часовой пояс")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка: неверный часовой пояс"
+        )
         return
     
     try:
@@ -144,13 +170,19 @@ async def save_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             WHERE chat_id = ?
         ''', (timezone, chat_id))
         
-        await query.edit_message_text(
-            f"✅ <b>Настройки сохранены!</b>\n\n"
-            f"🕒 Часовой пояс: <b>{timezone}</b>\n\n"
-            f"Уведомления будут отправляться по местному времени.",
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"✅ <b>Настройки сохранены!</b>\n\n"
+                 f"🕒 Часовой пояс: <b>{timezone}</b>\n\n"
+                 f"Уведомления будут отправляться по местному времени.",
             parse_mode='HTML'
         )
         
     except Exception as e:
         logger.error(f"Error saving timezone: {e}")
-        await query.edit_message_text("❌ Ошибка при сохранении настроек")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Ошибка при сохранении настроек"
+        )

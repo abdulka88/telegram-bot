@@ -17,7 +17,6 @@ async def my_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает предстоящие события текущего пользователя"""
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-    today = datetime.now().date().isoformat()
 
     try:
         with db_manager.get_connection() as conn:
@@ -41,7 +40,12 @@ async def my_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     await update.message.reply_text(response, reply_markup=reply_markup)
                 else:
                     query = update.callback_query
-                    await query.edit_message_text(response, reply_markup=reply_markup)
+                    # Отправляем новое сообщение вместо редактирования
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=response,
+                        reply_markup=reply_markup
+                    )
                 return
 
             # Получаем события сотрудника
@@ -103,7 +107,13 @@ async def my_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text(message, reply_markup=reply_markup, parse_mode='HTML')
         else:
             query = update.callback_query
-            await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='HTML')
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=message,
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
 
     except Exception as e:
         logger.error(f"Error in my_events: {e}")
@@ -115,7 +125,12 @@ async def my_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text(error_msg, reply_markup=reply_markup)
         else:
             query = update.callback_query
-            await query.edit_message_text(error_msg, reply_markup=reply_markup)
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=error_msg,
+                reply_markup=reply_markup
+            )
 
 async def all_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает все предстоящие события (для администраторов)"""
@@ -125,7 +140,11 @@ async def all_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not is_admin(chat_id, user_id):
         query = update.callback_query
         await query.answer()
-        await query.edit_message_text("❌ Только администратор может просматривать все события")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может просматривать все события"
+        )
         return
 
     try:
@@ -201,7 +220,13 @@ async def all_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         else:
             query = update.callback_query
             await query.answer()
-            await query.edit_message_text(response, reply_markup=reply_markup, parse_mode='HTML')
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=response,
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
 
     except Exception as e:
         logger.error(f"Error in all_events: {e}")
@@ -214,7 +239,12 @@ async def all_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         else:
             query = update.callback_query
             await query.answer()
-            await query.edit_message_text(error_msg, reply_markup=reply_markup)
+            # Отправляем новое сообщение вместо редактирования
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=error_msg,
+                reply_markup=reply_markup
+            )
 
 async def view_employee_details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает детали сотрудника и его события"""
@@ -234,7 +264,11 @@ async def view_employee_details(update: Update, context: ContextTypes.DEFAULT_TY
             employee = cursor.fetchone()
 
             if not employee:
-                await query.edit_message_text("❌ Сотрудник не найден")
+                # Отправляем новое сообщение вместо редактирования
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="❌ Сотрудник не найден"
+                )
                 return
 
             # Получение событий сотрудника
@@ -291,15 +325,21 @@ async def view_employee_details(update: Update, context: ContextTypes.DEFAULT_TY
             [InlineKeyboardButton("🔙 К списку", callback_data=create_callback_data("list_employees"))]
         ]
 
-        await query.edit_message_text(
-            "\n".join(response),
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="\n".join(response),
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='HTML'
         )
 
     except Exception as e:
         logger.error(f"Error in view_employee_details: {e}")
-        await query.edit_message_text("❌ Произошла ошибка при получении данных сотрудника")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Произошла ошибка при получении данных сотрудника"
+        )
 
 # Alias for backward compatibility
 view_all_events = all_events

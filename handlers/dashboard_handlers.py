@@ -26,7 +26,11 @@ async def dashboard_main(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = update.effective_user.id
     
     if not is_admin(chat_id, user_id):
-        await query.edit_message_text("❌ Только администратор может просматривать дашборд")
+        # Отправляем новое сообщение вместо редактирования
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Только администратор может просматривать дашборд"
+        )
         return
     
     # Получаем общую статистику
@@ -111,8 +115,10 @@ async def dashboard_main(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         [InlineKeyboardButton("🔙 Главное меню", callback_data=create_callback_data("menu"))]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -161,8 +167,10 @@ async def dashboard_analytics(update: Update, context: ContextTypes.DEFAULT_TYPE
         [InlineKeyboardButton("🔙 К дашборду", callback_data=create_callback_data("dashboard"))]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -229,8 +237,10 @@ async def dashboard_employees(update: Update, context: ContextTypes.DEFAULT_TYPE
         [InlineKeyboardButton("🔙 К дашборду", callback_data=create_callback_data("dashboard"))]
     ])
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -293,8 +303,10 @@ async def dashboard_performance(update: Update, context: ContextTypes.DEFAULT_TY
         [InlineKeyboardButton("🔙 К дашборду", callback_data=create_callback_data("dashboard"))]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -365,8 +377,10 @@ async def dashboard_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         [InlineKeyboardButton("🔙 К дашборду", callback_data=create_callback_data("dashboard"))]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -423,8 +437,10 @@ async def dashboard_timeline(update: Update, context: ContextTypes.DEFAULT_TYPE)
         [InlineKeyboardButton("🔙 К дашборду", callback_data=create_callback_data("dashboard"))]
     ]
     
-    await query.edit_message_text(
-        text,
+    # Отправляем новое сообщение вместо редактирования
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
