@@ -986,6 +986,23 @@ async def save_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return ConversationHandler.END
 
+async def cancel_edit_employee_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Отмена редактирования имени сотрудника"""
+    # Удаляем сообщение с кнопкой отмены если это сообщение
+    if update.message:
+        from core.utils import delete_message_safely
+        await delete_message_safely(context, update.effective_chat.id, update.message.message_id)
+    
+    # Отправляем сообщение об отмене и убираем клавиатуру
+    from telegram import ReplyKeyboardRemove
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="❌ Редактирование имени сотрудника отменено",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    
+    return ConversationHandler.END
+
 async def edit_employee_position(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Редактирование должности сотрудника"""
     query = update.callback_query
@@ -1031,7 +1048,7 @@ async def edit_employee_position(update: Update, context: ContextTypes.DEFAULT_T
                 prefix = "✅ " if position == employee['position'] else ""
                 row.append(InlineKeyboardButton(
                     f"{prefix}{position}",
-                    callback_data=create_callback_data("save_position", id=employee_id, pos=position)
+                    callback_data=create_callback_data("save_position", id=employee_id, pos_index=i + j)
                 ))
         keyboard.append(row)
     
@@ -1059,7 +1076,13 @@ async def save_employee_position(update: Update, context: ContextTypes.DEFAULT_T
     
     data = parse_callback_data(query.data)
     employee_id = data.get('id')
-    new_position = data.get('pos')
+    pos_index = data.get('pos_index')
+    
+    # Get position by index instead of directly
+    if pos_index is not None and 0 <= pos_index < len(AVAILABLE_POSITIONS):
+        new_position = AVAILABLE_POSITIONS[pos_index]
+    else:
+        new_position = None
     
     if not employee_id or not new_position:
         # Отправляем новое сообщение вместо редактирования

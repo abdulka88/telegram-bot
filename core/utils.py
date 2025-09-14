@@ -29,7 +29,7 @@ def create_callback_data(action: str, **kwargs) -> str:
     """
     data = {"action": action}
     data.update(kwargs)
-    return json.dumps(data, ensure_ascii=False)
+    return json.dumps(data, ensure_ascii=False, separators=(',', ':'))
 
 def parse_callback_data(callback_data: str) -> Dict[str, Any]:
     """
@@ -223,3 +223,18 @@ def singleton_lock():
     except (IOError, OSError) as e:
         print(f"Another instance is running or lock error: {e}")
         sys.exit(1)
+
+async def delete_message_safely(context, chat_id, message_id):
+    """
+    Безопасно удаляет сообщение, игнорируя ошибки
+    
+    Args:
+        context: Контекст бота
+        chat_id: ID чата
+        message_id: ID сообщения
+    """
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except Exception as e:
+        # Игнорируем ошибки удаления сообщений
+        pass

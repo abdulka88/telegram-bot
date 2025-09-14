@@ -24,6 +24,10 @@ class ConversationStates:
     ADD_EVENT_TO_EMPLOYEE_TYPE = 9
     ADD_EVENT_TO_EMPLOYEE_DATE = 10
     ADD_EVENT_TO_EMPLOYEE_INTERVAL = 11
+    
+    # Состояния для ввода дат прошедших событий
+    ADD_PAST_EVENT_DATES = 12
+    ADD_PAST_EVENT_DATE_INPUT = 13
 
 # Уровни уведомлений
 class NotificationLevel(Enum):

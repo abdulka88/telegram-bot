@@ -35,7 +35,7 @@ from handlers.search_handlers import handle_text_search_input
 from handlers.employee_handlers import (
     add_event_type, add_last_date, add_interval, edit_employee_name, save_employee_name,
     add_event_to_employee, add_event_to_employee_type, add_event_to_employee_date, 
-    add_event_to_employee_interval
+    add_event_to_employee_interval, handle_past_event_date_input, cancel_edit_employee_name
 )
 from handlers.export_handlers import export_menu_start, handle_export
 from handlers.template_handlers import templates_menu, select_employee_for_template, apply_template_to_employee
@@ -255,17 +255,18 @@ def main():
             entry_points=[
                 CallbackQueryHandler(
                     add_employee_start,
-                    pattern=r'.*"action"\s*:\s*"add_employee".*'
+                    pattern=r'.*"action":"add_employee".*'
                 )
             ],
             states={
                 ConversationStates.ADD_NAME: [
+                    MessageHandler(filters.Regex(r'^❌ Отмена$'), cancel_add_employee),
                     MessageHandler(filters.CONTACT, handle_contact),
                     MessageHandler(filters.TEXT & ~filters.COMMAND, add_employee_name)
                 ],
                 ConversationStates.ADD_POSITION: [
-                    CallbackQueryHandler(handle_position_selection, pattern=r'.*"action"\s*:\s*"select_position".*'),
-                    CallbackQueryHandler(cancel_add_employee, pattern=r'.*"action"\s*:\s*"cancel_add_employee".*')
+                    CallbackQueryHandler(handle_position_selection, pattern=r'.*"action":"select_position".*'),
+                    CallbackQueryHandler(cancel_add_employee, pattern=r'.*"action":"cancel_add_employee".*')
                 ],
                 ConversationStates.ADD_EVENT_TYPE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, add_event_type)
@@ -275,6 +276,12 @@ def main():
                 ],
                 ConversationStates.ADD_INTERVAL: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, add_interval)
+                ],
+                ConversationStates.ADD_PAST_EVENT_DATES: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_past_event_date_input)
+                ],
+                ConversationStates.ADD_PAST_EVENT_DATE_INPUT: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_past_event_date_input)
                 ],
             },
             fallbacks=[
@@ -297,12 +304,12 @@ def main():
             states={
                 ConversationStates.EDIT_NAME: [
                     MessageHandler(filters.TEXT & ~filters.Regex(r'^❌ Отмена$'), save_employee_name),
-                    MessageHandler(filters.Regex(r'^❌ Отмена$'), lambda u, c: cancel_add_employee(u, c))
+                    MessageHandler(filters.Regex(r'^❌ Отмена$'), cancel_edit_employee_name)
                 ]
             },
             fallbacks=[
-                MessageHandler(filters.Regex(r'^❌ Отмена$'), lambda u, c: cancel_add_employee(u, c)),
-                CommandHandler('cancel', lambda u, c: cancel_add_employee(u, c))
+                MessageHandler(filters.Regex(r'^❌ Отмена$'), cancel_edit_employee_name),
+                CommandHandler('cancel', cancel_edit_employee_name)
             ],
             per_message=False,
             per_chat=True,

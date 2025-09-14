@@ -320,8 +320,6 @@ async def view_employee_details(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard = [
             [InlineKeyboardButton("✏️ Редактировать",
                                   callback_data=create_callback_data("edit_employee", id=employee_id))],
-            [InlineKeyboardButton("➕ Добавить событие",
-                                  callback_data=create_callback_data("add_event", id=employee_id))],
             [InlineKeyboardButton("🔙 К списку", callback_data=create_callback_data("list_employees"))]
         ]
 

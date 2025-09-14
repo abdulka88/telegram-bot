@@ -367,10 +367,27 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             from handlers.settings_handlers import save_timezone
             await save_timezone(update, context)
             
-        # Обработчик сохранения позиции сотрудника
+        # Обработчики редактирования сотрудников
+        elif action == "edit_employee":
+            from handlers.employee_handlers import edit_employee_start
+            await edit_employee_start(update, context)
+            
+        elif action == "edit_name":
+            from handlers.employee_handlers import edit_employee_name
+            await edit_employee_name(update, context)
+            
+        elif action == "edit_position":
+            from handlers.employee_handlers import edit_employee_position
+            await edit_employee_position(update, context)
+            
         elif action == "save_position":
             from handlers.employee_handlers import save_employee_position
             await save_employee_position(update, context)
+            
+        # Обработчики добавления событий к сотруднику
+        elif action == "add_event_to_employee":
+            from handlers.employee_handlers import add_event_to_employee
+            await add_event_to_employee(update, context)
             
         # Обработчики удаления сотрудника
         elif action == "delete_employee":
